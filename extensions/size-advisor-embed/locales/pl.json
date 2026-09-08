@@ -40,6 +40,7 @@
     "added": "Dodano rozmiar [size] do koszyka",
     "go_to_cart": "Przejdź do koszyka",
     "add_failed": "Nie udało się dodać do koszyka. Wybierz rozmiar ręcznie powyżej.",
+    "out_of_stock": "Rozmiar [size] jest obecnie niedostępny.",
     "pick_above": "Wybierz rozmiar [size] powyżej, aby dodać produkt do koszyka."
   }
 }

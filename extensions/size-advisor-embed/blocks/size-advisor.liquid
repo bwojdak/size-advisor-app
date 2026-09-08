@@ -508,6 +508,7 @@
     added: {{ 'size_advisor.added' | t | json }},
     go_to_cart: {{ 'size_advisor.go_to_cart' | t | json }},
     add_failed: {{ 'size_advisor.add_failed' | t | json }},
+    out_of_stock: {{ 'size_advisor.out_of_stock' | t | json }},
     pick_above: {{ 'size_advisor.pick_above' | t | json }}
   };
   window.__SA_LOCALE = {{ localization.language.iso_code | json }};
@@ -556,6 +557,7 @@
       added: "Dodano rozmiar [size] do koszyka",
       go_to_cart: "Przejdź do koszyka",
       add_failed: "Nie udało się dodać do koszyka. Wybierz rozmiar ręcznie powyżej.",
+      out_of_stock: "Rozmiar [size] jest obecnie niedostępny.",
       pick_above: "Wybierz rozmiar [size] powyżej, aby dodać produkt do koszyka."
     },
     en: {
@@ -599,6 +601,7 @@
       added: "Added size [size] to cart",
       go_to_cart: "Go to cart",
       add_failed: "Could not add to cart. Please pick a size manually above.",
+      out_of_stock: "Size [size] is currently out of stock.",
       pick_above: "Pick size [size] above to add the product to cart."
     }
   };
@@ -798,11 +801,22 @@
       cartAction.innerHTML = '';
       const variant = findVariantForSize(size);
 
+      // Brak wariantu w tym rozmiarze w ogóle → poproś o ręczny wybór.
       if (!variant) {
         cartAction.hidden = false;
         const note = document.createElement('p');
         note.className = 'sa-cart-note';
         note.innerText = withSize(I18N.pick_above, size);
+        cartAction.appendChild(note);
+        return;
+      }
+
+      // Wariant istnieje, ale wyprzedany → komunikat zamiast martwego przycisku.
+      if (variant.available === false) {
+        cartAction.hidden = false;
+        const note = document.createElement('p');
+        note.className = 'sa-cart-note';
+        note.innerText = withSize(I18N.out_of_stock, size);
         cartAction.appendChild(note);
         return;
       }

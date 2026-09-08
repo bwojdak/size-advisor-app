@@ -40,6 +40,7 @@
     "added": "Added size [size] to cart",
     "go_to_cart": "Go to cart",
     "add_failed": "Could not add to cart. Please pick a size manually above.",
+    "out_of_stock": "Size [size] is currently out of stock.",
     "pick_above": "Pick size [size] above to add the product to cart."
   }
 }
