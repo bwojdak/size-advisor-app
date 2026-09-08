@@ -1,0 +1,1357 @@
+// Wspólna logika rekomendacji rozmiaru, używana przez publiczny endpoint
+// (app/routes/api.recommend.ts) oraz tester w panelu (app/routes/app.test-prompt.ts).
+//
+// PODZIAŁ PRACY (hybryda):
+//   1. Model AI  – TYLKO odczytuje tabelę wymiarów ze zdjęcia / tekstu, klasyfikuje
+//      kategorię i luz kroju, szacuje obwody ciała klienta. Zero arytmetyki.
+//   2. Kod (resolveSize) – deterministycznie wybiera rozmiar: okno luzu wg kroju,
+//      lista kandydatów, remis rozstrzygany preferencją fasonu, korekta ze stylu
+//      marki. Wynik jest powtarzalny (koniec „mrugania" M↔L).
+//   3. Uzasadnienie – składane z szablonu (PL/EN) na prawdziwych liczbach.
+//
+// Provider wybiera `AI_PROVIDER` w .env: "openai" (OPENAI_API_KEY) albo "gemini".
+
+import OpenAI from "openai";
+
+export class AIQuotaError extends Error {
+  constructor(message = "AI quota exceeded") {
+    super(message);
+    this.name = "AIQuotaError";
+  }
+}
+
+export class AICallError extends Error {
+  constructor(message = "AI call failed") {
+    super(message);
+    this.name = "AICallError";
+  }
+}
+
+export type AIProvider = "openai" | "gemini";
+
+export function getAIConfig(): { provider: AIProvider; model: string } {
+  const provider: AIProvider =
+    process.env.AI_PROVIDER === "openai" ? "openai" : "gemini";
+  const model =
+    provider === "gemini"
+      ? process.env.GEMINI_MODEL || "gemini-3.6-flash"
+      : process.env.OPENAI_MODEL || "gpt-4o-mini";
+  return { provider, model };
+}
+
+export const SIZE_CHART_IMAGE_RE = /^data:(image\/(?:png|jpe?g|webp));base64,(.+)$/;
+
+// ---------------------------------------------------------------------------
+// Typy
+// ---------------------------------------------------------------------------
+
+export type FitPreference = "fitted" | "loose" | null;
+export type GarmentCategory = "top" | "bottom" | "dress";
+export type CutLooseness = "slim" | "regular" | "relaxed" | "oversize";
+
+/** Jeden wiersz tabeli wymiarów po normalizacji (wszystkie obwody = PEŁNE, w cm). */
+export type NormalizedSizeRow = {
+  size: string;
+  chest?: number | null; // obwód w klatce
+  waist?: number | null; // obwód w pasie
+  hip?: number | null; // obwód bioder
+  length?: number | null; // długość tyłu (góra) / całkowita (dół)
+  inseam?: number | null; // długość wewnętrzna nogawki (dół)
+};
+
+/** To, co model ma zwrócić – żadnych decyzji rozmiarowych. */
+export type ChartExtraction = {
+  rows: NormalizedSizeRow[];
+  category: GarmentCategory;
+  cut: CutLooseness;
+  bodyChest: number | null;
+  bodyWaist: number | null;
+  bodyHip: number | null;
+  korekta: -1 | 0 | 1;
+  /** Dzianina / stretch (elastan, jersey, modal, dzianina) – może przylegać. */
+  stretch: boolean;
+  /** Pas na gumce / sznurku – obwód pasa nie ogranicza rozmiaru. */
+  elasticWaist: boolean;
+  /** Odzież wierzchnia (kurtka, płaszcz) – potrzebny luz na warstwy. */
+  outerwear: boolean;
+  /** „Model ma 184 cm i nosi rozmiar L" – wzorzec marki, jeśli podany w opisie. */
+  modelHeight: number | null;
+  modelSize: string | null;
+  /** Rozmiar z tej tabeli równoważny podanemu ubraniu referencyjnemu klienta. */
+  refEquivalentSize: string | null;
+  /** Zapasowy typ, gdy nie ma żadnej tabeli – wtedy model zgaduje sam. */
+  fallbackSize: string | null;
+  fallbackExplanation: string | null;
+};
+
+type PromptInput = {
+  productTitle?: string | null;
+  productDescription?: string | null;
+  gender?: string | null;
+  height?: number | string | null;
+  weight?: number | string | null;
+  bodyType?: string | null;
+  brandStyleNotes?: string | null;
+  productSizeData?: string | null;
+  productNotes?: string | null;
+  hasSizeChartImage?: boolean;
+  fitPreference?: FitPreference;
+  /** „Mam dobrze leżące Nike M" — mocna kotwica obwodu ciała. */
+  referenceGarment?: { brand?: string | null; size?: string | null } | null;
+  /** ISO 639-1 kod, w którym ma być zapasowe uzasadnienie modelu. */
+  responseLanguage?: string | null;
+  /** true → prompt tylko o produkcie (bez sylwetki klienta) — używany do
+   *  jednorazowej analizy produktu przy konfiguracji przez admina. */
+  omitShopper?: boolean;
+};
+
+const LANGUAGE_HINTS: Record<string, string> = {
+  pl: "polskim",
+  en: "angielskim (English)",
+  de: "niemieckim (Deutsch)",
+  fr: "francuskim (Français)",
+  es: "hiszpańskim (Español)",
+  it: "włoskim (Italiano)",
+  nl: "niderlandzkim (Nederlands)",
+  cs: "czeskim (Čeština)",
+  uk: "ukraińskim (Українська)",
+};
+
+// ---------------------------------------------------------------------------
+// Stałe decyzyjne (dostrajalne bez ruszania AI)
+// ---------------------------------------------------------------------------
+
+const CANON_SIZES = [
+  "XXS",
+  "XS",
+  "S",
+  "M",
+  "L",
+  "XL",
+  "XXL",
+  "3XL",
+  "4XL",
+  "5XL",
+];
+
+/** Docelowy luz w OBWODZIE dla GÓRY (cm dodane do obwodu klatki) wg kroju.
+ *  Dzianina/stretch może przylegać (slim schodzi poniżej zera); tkanina
+ *  (koszula, denim) potrzebuje realnego luzu, żeby dało się ruszać i zapiąć. */
+const EASE_TOP_STRETCH: Record<CutLooseness, [number, number]> = {
+  slim: [-4, 6],
+  regular: [6, 16],
+  relaxed: [14, 30],
+  oversize: [24, 48],
+};
+const EASE_TOP_WOVEN: Record<CutLooseness, [number, number]> = {
+  slim: [4, 12],
+  regular: [9, 20],
+  relaxed: [16, 32],
+  oversize: [24, 48],
+};
+
+/** Docelowy luz w OBWODZIE dla DOŁU (pas). Spodnie/jeansy siedzą na pasie – luz
+ *  jest mały niezależnie od tego, jak „szeroki" jest krój (szerokość jest w
+ *  nogawce, nie w pasie). Dresy z gumą są odrobinę bardziej wybaczające. */
+const EASE_BOTTOM: Record<CutLooseness, [number, number]> = {
+  slim: [-3, 2],
+  regular: [-2, 5],
+  relaxed: [-1, 9],
+  oversize: [0, 14],
+};
+
+/** Tolerancja kandydata w trybie „po długości" (cm od celu). */
+const TOP_LENGTH_TOL = 2;
+
+/** Na ile wynik z ubrania referencyjnego może odbiegać od rozmiaru, który daje
+ *  sam obwód ciała, zanim uznamy go za halucynację. Asymetrycznie: ubranie
+ *  „luźniejsze niż sugeruje sylwetka" jest wiarygodne (preferencja, warstwy) do
+ *  +2 rozmiarów; „ciaśniejsze" tylko do −1 — bo zbyt mały rozmiar to realne
+ *  ryzyko, że klient go nie założy. */
+const REF_MAX_LARGER = 2;
+const REF_MAX_SMALLER = 1;
+
+/** Docelowa długość wewnętrzna nogawki wg wzrostu (cm) – tylko jako remis-breaker. */
+function inseamBand(h: number): [number, number] {
+  if (h <= 165) return [73, 79];
+  if (h <= 175) return [76, 82];
+  if (h <= 183) return [79, 85];
+  if (h <= 190) return [82, 88];
+  return [85, 91];
+}
+
+function clamp(n: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+function sizeIndex(size: string): number {
+  const i = CANON_SIZES.indexOf(size.toUpperCase().replace(/\s+/g, ""));
+  return i === -1 ? 50 : i;
+}
+
+// Zgrubne oszacowanie obwodów ciała – używane, gdy model nie poda sensownej liczby.
+function estimateChest(
+  h: number,
+  w: number,
+  gender: string,
+  build: string,
+): number {
+  const female = gender === "female";
+  const base = female ? 90 : 96;
+  // Odchyłka od „wagi należnej" – dla kobiet niższy punkt odniesienia.
+  const weightAdj = (w - (h - (female ? 108 : 100))) * 0.62;
+  const buildAdj =
+    build === "slim" ? -3 : build === "athletic" ? 3 : build === "plus" ? 11 : 0;
+  return clamp(base + weightAdj + buildAdj + (h - 175) * 0.25, 74, 152);
+}
+
+function estimateWaist(
+  h: number,
+  w: number,
+  gender: string,
+  build: string,
+): number {
+  const chest = estimateChest(h, w, gender, build);
+  const drop = gender === "female" ? 18 : 13;
+  const buildAdj =
+    build === "plus" ? 8 : build === "athletic" ? -1 : build === "slim" ? -2 : 0;
+  return clamp(chest - drop + buildAdj, 56, 142);
+}
+
+/** Zgrubny rozmiar litery, gdy produkt NIE MA tabeli — deterministycznie z
+ *  obwodu klatki/biustu (nie z „M" wyplutego przez model). Preferencja fasonu
+ *  przesuwa o jeden krok. */
+function estimateLetterSize(
+  h: number,
+  w: number,
+  gender: string,
+  build: string,
+  fit: FitPreference,
+): string {
+  const chest = estimateChest(h, w, gender, build);
+  // Górna granica pasma → etykieta (pełny obwód w cm).
+  const bands: Array<[number, string]> =
+    gender === "female"
+      ? [[82, "XS"], [88, "S"], [94, "M"], [100, "L"], [108, "XL"], [116, "XXL"]]
+      : [[86, "XS"], [94, "S"], [102, "M"], [110, "L"], [118, "XL"], [128, "XXL"]];
+  let label = "3XL";
+  for (const [hi, s] of bands) {
+    if (chest < hi) {
+      label = s;
+      break;
+    }
+  }
+  let idx = CANON_SIZES.indexOf(label);
+  if (idx < 0) idx = CANON_SIZES.indexOf("M");
+  // Bez tabeli tylko „loose" przesuwa w górę — automatyczne schodzenie przy
+  // „fitted" grozi za małym rozmiarem, którego klient nie założy (a osoba
+  // preferująca fason dopasowany zwykle i tak jest w dolnej części pasma).
+  if (fit === "loose") idx += 1;
+  idx = clamp(idx, CANON_SIZES.indexOf("XS"), CANON_SIZES.indexOf("4XL"));
+  return CANON_SIZES[idx];
+}
+
+// ---------------------------------------------------------------------------
+// Prompt ekstrakcyjny (model NIE wybiera rozmiaru)
+// ---------------------------------------------------------------------------
+
+export function buildSizeAdvisorPrompt(input: PromptInput): string {
+  const brandStyleNotes = input.brandStyleNotes?.trim();
+  const brandStyleSection = brandStyleNotes
+    ? `\nWYTYCZNE MARKI (uwzględnij przy polu "krojLuz" i "korektaRozmiaru"):\n"""\n${brandStyleNotes}\n"""\n`
+    : "";
+
+  const productSizeData = input.productSizeData?.trim();
+  const productNotes = input.productNotes?.trim();
+  const productSection = `${
+    productSizeData
+      ? `\nOFICJALNA TABELA WYMIARÓW (ŹRÓDŁO NADRZĘDNE — przepisz "tabela" WYŁĄCZNIE z niej):\n"""\n${productSizeData}\n"""\n`
+      : ""
+  }${
+    productNotes
+      ? `\nUWAGI DO PRODUKTU (uwzględnij przy "krojLuz" i "korektaRozmiaru"):\n"""\n${productNotes}\n"""\n`
+      : ""
+  }${
+    input.hasSizeChartImage
+      ? productSizeData
+        ? `\nDołączono też ZDJĘCIE rozmiarówki, ale MASZ już tabelę tekstową powyżej — użyj zdjęcia tylko do uzupełnienia brakującego wymiaru, jeśli w tabeli tekstowej jest luka. Nie dodawaj rozmiarów, których nie ma w tabeli tekstowej.\n`
+        : `\nDo wiadomości dołączono ZDJĘCIE rozmiarówki – odczytaj z niego wszystkie wymiary.\n`
+      : ""
+  }`;
+
+  const fitLine = input.fitPreference
+    ? `\nKlient zaznaczył preferencję fasonu: ${
+        input.fitPreference === "fitted" ? "bardziej dopasowany" : "luźniejszy"
+      } (to rozstrzyga program, nie Ty).\n`
+    : "";
+
+  const ref = input.referenceGarment;
+  const refBrand = ref?.brand?.trim();
+  const refSize = ref?.size?.trim();
+  const refLine =
+    refBrand && refSize
+      ? `\nUBRANIE REFERENCYJNE: klient mówi, że „${refBrand}" w rozmiarze „${refSize}" (podobny typ jak ten produkt) leży na nim IDEALNIE. Jeśli PEWNIE znasz realne wymiary tej konkretnej marki i rozmiaru, porównaj UBRANIE DO UBRANIA (nie licz obwodu ciała) i wpisz w "refRozmiarWTabeli" ten rozmiar z "tabela", który leżałby najbardziej podobnie.\nWpisz null, jeśli: nie znasz tej marki, to marka mało znana / regionalna / lokalna, nazwa lub rozmiar wyglądają na przypadkowe / błędne, albo nie jesteś pewny wymiarów. NIE zgaduj i NIE wpisuj rozmiaru „na oko" z samego wzrostu/wagi — od tego jest program. Lepiej null niż zła podpowiedź.\n`
+      : "";
+
+  const langCode = (input.responseLanguage || "pl").toLowerCase().slice(0, 2);
+  const langHint = LANGUAGE_HINTS[langCode] || `o kodzie ISO 639-1 "${langCode}"`;
+
+  const shopperBlock = input.omitShopper
+    ? "\n(Brak danych klienta — analizujesz sam produkt. Pola „obwod...Klienta” oraz „refRozmiarWTabeli” zostaw jako null.)\n"
+    : `- Płeć: ${input.gender === "female" ? "kobieta" : "mężczyzna"}
+- Wzrost: ${input.height} cm, waga: ${input.weight} kg
+- Budowa: ${input.bodyType || "standard"}
+${fitLine}${refLine}`;
+
+  return `
+Jesteś ekspertem od rozmiarówek odzieży. Twoje ZADANIE: odczytać dane i je sklasyfikować.
+NIE wybierasz rozmiaru – zrobi to program na podstawie Twoich danych.
+
+DANE WEJŚCIOWE:
+- Produkt: ${input.productTitle || "Odzież"}
+- Opis/wymiary z karty produktu: ${input.productDescription || "brak"}
+${shopperBlock}${brandStyleSection}${productSection}
+ZWRÓĆ WYŁĄCZNIE czysty JSON (bez \`\`\`), dokładnie w tym kształcie:
+{
+  "tabela": [
+    { "rozmiar": "S", "obwodKlatki": 130, "obwodPasa": null, "obwodBioder": null, "dlugosc": 68, "dlugoscNogawki": null }
+  ],
+  "kategoria": "gora" | "dol" | "sukienka",
+  "krojLuz": "obcisly" | "regularny" | "swobodny" | "oversize",
+  "obwodKlatkiKlienta": 96,
+  "obwodPasaKlienta": 82,
+  "obwodBioderKlienta": 98,
+  "korektaRozmiaru": 0,
+  "dzianina": true,
+  "pasNaGumce": false,
+  "odziezWierzchnia": false,
+  "modelWzrost": null,
+  "modelRozmiar": null,
+  "refRozmiarWTabeli": null,
+  "zapasowyRozmiar": null,
+  "zapasoweUzasadnienie": ""
+}
+
+ZASADY:
+- "tabela": przepisz KAŻDY rozmiar i KAŻDY wymiar z tabeli/zdjęcia/opisu. Obwody podawaj jako PEŁNE w cm – jeśli tabela podaje połowę ("Pacha", "1/2 klatki", "szerokość", "A", "½"), pomnóż przez 2. Brak wymiaru = null. Nie zgaduj wartości, których nie ma.
+- Jeśli NIE MA żadnych wymiarów (ani zdjęcia, ani tabeli, ani liczb w opisie): "tabela": [], a Ty sam oszacuj "zapasowyRozmiar" (XS–XXL) i krótkie "zapasoweUzasadnienie" (max 2 zdania, w języku ${langHint}) – jeśli wytyczne marki każą schodzić/podnosić rozmiar, uwzględnij to i wspomnij o tym. W przeciwnym razie zostaw je jako null / "".
+- "kategoria": "dol" = spodnie, jeansy, dresy, szorty, spódnica. "gora" = t-shirt, koszula, bluza, hoodie, sweter, kurtka. "sukienka" = sukienka, kombinezon.
+- "krojLuz": oceń z nazwy, opisu, wytycznych marki ORAZ z samych wymiarów (obwód ubrania vs obwód klienta): "obcisly" (slim/skinny), "regularny", "swobodny" (relaxed/loose/baggy/szerokie), "oversize" (boxy, drop shoulder, bardzo szerokie).
+- "obwod...Klienta": oszacuj z płci, wzrostu, wagi, budowy. Podaj liczby, nie null.
+- "korektaRozmiaru": -1 jeśli marka/uwagi każą "brać mniejszy / rozmiarówka zawyżona / size down"; +1 przy "brać większy / zawężona"; inaczej 0.
+- "dzianina": true jeśli materiał jest rozciągliwy (dzianina, jersey, elastan/spandex/lycra, modal, prążek, sweter). false dla tkaniny (denim/jeans, popelina, twill, gabardyna, len, płótno, "woven").
+- "pasNaGumce": true jeśli pas jest elastyczny / na gumce / ze sznurkiem / ściągaczem (dresy, joggery). false dla sztywnego pasa z guzikiem (jeansy, chinosy, spodnie garniturowe).
+- "odziezWierzchnia": true dla kurtki, płaszcza, parki, marynarki noszonej na wierzch. false dla t-shirtu, bluzy, koszuli.
+- "modelWzrost" / "modelRozmiar": jeśli opis podaje wzorzec typu "Model ma 184 cm i nosi rozmiar L", wpisz 184 i "L". Inaczej null.
+- "refRozmiarWTabeli": TYLKO gdy podano UBRANIE REFERENCYJNE, znasz PEWNIE wymiary tej marki+rozmiaru i etykieta jest jedną z tych w "tabela" (np. "M", "32"). Przy jakiejkolwiek wątpliwości (nieznana / lokalna marka, dziwna nazwa lub rozmiar) → null. Nie zgaduj z sylwetki klienta.
+`;
+}
+
+// ---------------------------------------------------------------------------
+// Decyzja rozmiarowa – czysta funkcja, deterministyczna, testowalna
+// ---------------------------------------------------------------------------
+
+type ResolveInput = {
+  extraction: ChartExtraction;
+  height: number;
+  weight: number;
+  gender: string;
+  bodyType: string;
+  fit: FitPreference;
+  /** Korektę ze stylu marki stosujemy tylko, gdy realnie były notatki marki /
+   *  produktu – inaczej model bywa nadgorliwy i przesuwa rozmiar bez powodu. */
+  allowKorekta: boolean;
+  /** Dobrze leżące ubranie referencyjne podane przez klienta (marka + rozmiar). */
+  referenceGarment?: { brand: string; size: string } | null;
+};
+
+export type ResolveResult = {
+  size: string;
+  mode: "chest" | "waist" | "length";
+  chosenValue: number;
+  /** Obwód ciała (klatka/pas) faktycznie użyty w decyzji – do uzasadnienia. */
+  bodyPrimaryUsed: number;
+  window: [number, number];
+  candidates: string[];
+  korektaApplied: -1 | 0 | 1;
+  tieBrokenBy: "fit" | "build" | "midpoint" | "single" | null;
+  /** true → rozmiar wyprowadzony z „model marki ma X cm i nosi Y". */
+  anchoredToModel: boolean;
+  modelRef: { height: number; size: string } | null;
+  /** ustawione, gdy rozmiar wyszedł z porównania do ubrania referencyjnego. */
+  matchedReference: { brand: string; size: string } | null;
+};
+
+export function resolveSize(input: ResolveInput): ResolveResult | null {
+  const { extraction, height, weight, gender, bodyType, fit } = input;
+  const allowKorekta = input.allowKorekta;
+  let rows = [...extraction.rows]
+    .filter((r) => r && typeof r.size === "string" && r.size.trim())
+    .sort((a, b) => sizeIndex(a.size) - sizeIndex(b.size));
+  if (rows.length < 2) return null; // brak sensownej tabeli → caller użyje fallbacku
+
+  const category = extraction.category;
+  const cut = extraction.cut;
+
+  const useWaist = category === "bottom";
+  let mode: "chest" | "waist" | "length" = useWaist ? "waist" : "chest";
+
+  // Normalizacja połówek obwodu → pełny obwód, na CAŁEJ tabeli.
+  const isHalf = (key: "chest" | "waist") => {
+    const vals = rows
+      .map((r) => r[key])
+      .filter((v): v is number => typeof v === "number" && v > 0);
+    return vals.length >= 2 && vals.every((v) => v < 78);
+  };
+  const chestHalf = isHalf("chest");
+  const waistHalf = isHalf("waist");
+  if (chestHalf || waistHalf) {
+    rows = rows.map((r) => ({
+      ...r,
+      chest: chestHalf && r.chest ? r.chest * 2 : r.chest,
+      waist: waistHalf && r.waist ? r.waist * 2 : r.waist,
+    }));
+  }
+  // Sanity: obwód klatki/pasa > ~135 cm dla NAJMNIEJSZEGO rozmiaru to prawie
+  // na pewno błąd modelu (podwojona wartość, która już była pełna). Cofnij ×2.
+  for (const key of ["chest", "waist"] as const) {
+    const vals = rows
+      .map((r) => r[key])
+      .filter((v): v is number => typeof v === "number" && v > 0);
+    if (vals.length >= 3 && Math.min(...vals) > 135) {
+      rows = rows.map((r) => ({
+        ...r,
+        [key]: r[key] ? Math.round((r[key] as number) / 2) : r[key],
+      }));
+    }
+  }
+
+  // Wymiar wiążący: dół → pas; sukienka → biust, a jak brak, to biodra/talia
+  // (model bywa niekonsekwentny, w którym polu zapisze obwód sukienki).
+  const primaryOf = (r: NormalizedSizeRow) =>
+    useWaist
+      ? r.waist
+      : category === "dress"
+        ? (r.chest ?? r.hip ?? r.waist)
+        : r.chest;
+  const usable = rows.filter(
+    (r) => typeof primaryOf(r) === "number" && (primaryOf(r) as number) > 0,
+  );
+
+  // Obwód ciała WYŁĄCZNIE z wzoru antropometrycznego. Szacunki modelu
+  // (pole "obwod...Klienta") to zwykle stałe „średnie populacyjne" – bezużyteczne.
+  const bodyPrimary = Math.round(
+    useWaist
+      ? estimateWaist(height, weight, gender, bodyType)
+      : estimateChest(height, weight, gender, bodyType),
+  );
+
+  const easeTable = useWaist
+    ? EASE_BOTTOM
+    : extraction.stretch
+      ? EASE_TOP_STRETCH
+      : EASE_TOP_WOVEN;
+  const outer = !useWaist && extraction.outerwear ? 5 : 0; // luz na warstwy
+  const [easeLo, easeHi] = (easeTable[cut] ?? easeTable.regular).map(
+    (v) => v + outer,
+  ) as [number, number];
+
+  // Wymiar „długościowy" do gradacji – bierzemy pierwszy z realnym rozrzutem
+  // (model potrafi wpisać stałą wartość w kolumnę, której nie ma → bezużyteczna).
+  const spread = (f: (r: NormalizedSizeRow) => number | null | undefined) => {
+    const vals = rows
+      .map(f)
+      .filter((v): v is number => typeof v === "number" && v > 0);
+    return vals.length >= 2 && new Set(vals).size >= 2
+      ? Math.max(...vals) - Math.min(...vals)
+      : 0;
+  };
+  const lengthPriority = useWaist
+    ? [(r: NormalizedSizeRow) => r.inseam, (r: NormalizedSizeRow) => r.length]
+    : [(r: NormalizedSizeRow) => r.length, (r: NormalizedSizeRow) => r.inseam];
+  let lengthDimFn: ((r: NormalizedSizeRow) => number) | null = null;
+  for (const f of lengthPriority) {
+    if (spread(f) >= 2) {
+      lengthDimFn = (r) => f(r) as number;
+      break;
+    }
+  }
+
+  // Wzorzec marki: „model ma 184 cm i nosi rozmiar L" – najsilniejszy sygnał,
+  // działa dla każdej kategorii. Jeśli jest, kotwiczymy na nim.
+  const modelRow =
+    extraction.modelHeight &&
+    extraction.modelHeight > 120 &&
+    extraction.modelHeight < 220 &&
+    extraction.modelSize
+      ? rows.find(
+          (r) =>
+            r.size.toUpperCase().replace(/\s+/g, "") ===
+            extraction.modelSize!.toUpperCase().replace(/\s+/g, ""),
+        )
+      : undefined;
+
+  // --- Ubranie referencyjne klienta („mam Nike L, leży idealnie") ---
+  // Porównanie UBRANIE-DO-UBRANIA; najsilniejszy sygnał (od klienta, nie marki).
+  // ZABEZPIECZENIE: gdy model nie zna marki, zwraca null (patrz prompt) → tu nie
+  // wchodzimy. Gdy zwróci etykietę spoza tabeli → rIdx < 0 → nie wchodzimy.
+  // Gdy zwróci rozmiar rażąco sprzeczny z obwodem ciała (halucynacja) →
+  // odrzucamy go i lecimy dalej zwykłą ścieżką obwodową.
+  if (input.referenceGarment && extraction.refEquivalentSize) {
+    const want = extraction.refEquivalentSize.toUpperCase().replace(/\s+/g, "");
+    const rIdx = rows.findIndex(
+      (r) => r.size.toUpperCase().replace(/\s+/g, "") === want,
+    );
+
+    // Zdroworozsądkowa kontrola: najbliższy rozmiar wg samego obwodu ciała.
+    let refTrusted = rIdx >= 0;
+    if (rIdx >= 0 && usable.length >= 2) {
+      const centerEase = (easeLo + easeHi) / 2;
+      const target = bodyPrimary + centerEase;
+      let bodyIdx = rIdx;
+      let bestGap = Infinity;
+      rows.forEach((r, i) => {
+        const p = primaryOf(r);
+        if (typeof p === "number" && p > 0) {
+          const gap = Math.abs(p - target);
+          if (gap < bestGap) {
+            bestGap = gap;
+            bodyIdx = i;
+          }
+        }
+      });
+      const delta = rIdx - bodyIdx; // + = ref większy niż sugeruje sylwetka
+      if (delta > REF_MAX_LARGER || delta < -REF_MAX_SMALLER) {
+        refTrusted = false;
+        console.warn(
+          "[resolveSize] ubranie referencyjne odrzucone — kłóci się z obwodem ciała",
+          {
+            brand: input.referenceGarment.brand,
+            size: input.referenceGarment.size,
+            refSize: rows[rIdx].size,
+            bodySize: rows[bodyIdx].size,
+            delta,
+          },
+        );
+      }
+    }
+
+    if (refTrusted) {
+      let idx = rIdx;
+      let tie: ResolveResult["tieBrokenBy"] = "single";
+      if (fit === "fitted" && idx > 0) {
+        idx -= 1;
+        tie = "fit";
+      } else if (fit === "loose" && idx < rows.length - 1) {
+        idx += 1;
+        tie = "fit";
+      }
+      let chosen = rows[idx];
+      let korektaApplied: -1 | 0 | 1 = 0;
+      const k = extraction.korekta;
+      if (allowKorekta && (k === -1 || k === 1)) {
+        const ni = clamp(idx + k, 0, rows.length - 1);
+        if (ni !== idx) {
+          chosen = rows[ni];
+          korektaApplied = k;
+        }
+      }
+      const pv = useWaist
+        ? chosen.waist
+        : (chosen.chest ?? chosen.hip ?? chosen.waist);
+      return {
+        size: chosen.size.toUpperCase().replace(/\s+/g, ""),
+        mode: useWaist ? "waist" : "chest",
+        chosenValue: Math.round((pv as number) || 0),
+        bodyPrimaryUsed: Math.round(bodyPrimary),
+        window: [0, 0],
+        candidates: [rows[rIdx].size.toUpperCase().replace(/\s+/g, "")],
+        korektaApplied,
+        tieBrokenBy: tie,
+        anchoredToModel: false,
+        modelRef: null,
+        matchedReference: input.referenceGarment,
+      };
+    }
+  }
+
+  const smallestPrimary = usable.length
+    ? Math.min(...usable.map((r) => primaryOf(r) as number))
+    : Infinity;
+
+  // Tryb „po długości" tylko dla GÓRY (nie sukienek – te zawsze po biuście,
+  // długość to styl mini/midi, nie rozmiar). „Ukryty oversize" gdy najmniejszy
+  // rozmiar jest ~2 rozmiary szerszy niż sylwetka.
+  const topProportional =
+    category === "top" &&
+    (cut === "oversize" ||
+      (usable.length >= 2 && smallestPrimary > bodyPrimary + 18)) &&
+    lengthDimFn != null;
+  const bottomElastic =
+    useWaist &&
+    lengthDimFn != null &&
+    usable.length >= 2 &&
+    (extraction.elasticWaist ||
+      usable.every((r) => (primaryOf(r) as number) < bodyPrimary - 3));
+  const proportional = topProportional || bottomElastic;
+
+  let candRows: NormalizedSizeRow[];
+  let window: [number, number];
+  let valueOf: (r: NormalizedSizeRow) => number;
+  let target: number;
+  let anchoredToModel = false;
+
+  if (
+    modelRow &&
+    ((lengthDimFn && lengthDimFn(modelRow) > 0) ||
+      (primaryOf(modelRow) ?? 0) > 0)
+  ) {
+    // --- Tryb: kotwica na wzorcu marki ---
+    anchoredToModel = true;
+    const gradeOnLength = Boolean(lengthDimFn && lengthDimFn(modelRow) > 0);
+    valueOf =
+      gradeOnLength && lengthDimFn
+        ? lengthDimFn
+        : (r) => primaryOf(r) as number;
+    mode = gradeOnLength ? "length" : useWaist ? "waist" : "chest";
+    const pool = rows.filter((r) => (valueOf(r) ?? 0) > 0);
+    const baseIdx = pool.indexOf(modelRow);
+    const HEIGHT_PER_SIZE = 6;
+    const raw = (height - extraction.modelHeight!) / HEIGHT_PER_SIZE;
+    const step = Math.round(raw);
+    const idx = clamp(baseIdx + step, 0, pool.length - 1);
+    target = valueOf(pool[idx]);
+    window = [target - 1, target + 1];
+    candRows = [pool[idx]];
+    const frac = raw - step;
+    if (frac >= 0.2 && idx + 1 < pool.length) candRows.push(pool[idx + 1]);
+    else if (frac <= -0.2 && idx - 1 >= 0) candRows.unshift(pool[idx - 1]);
+  } else if (proportional && lengthDimFn) {
+    // --- Tryb: po długości vs wzrost (bez wzorca) ---
+    mode = "length";
+    valueOf = lengthDimFn;
+    const pool = rows.filter((r) => (valueOf(r) ?? 0) > 0);
+    const lens = pool.map(valueOf).sort((a, b) => a - b);
+    const mid = (lens.length - 1) / 2;
+    const median = (lens[Math.floor(mid)] + lens[Math.ceil(mid)]) / 2;
+    target = Math.round(median + (height - 178) * 0.38);
+    window = [target - TOP_LENGTH_TOL, target + TOP_LENGTH_TOL];
+    candRows = pool.filter(
+      (r) => valueOf(r) >= window[0] && valueOf(r) <= window[1],
+    );
+    if (candRows.length === 0) candRows = nearest(pool, valueOf, window);
+  } else {
+    // --- Tryb: po obwodzie + luz kroju ---
+    window = [bodyPrimary + easeLo, bodyPrimary + easeHi];
+    target = (window[0] + window[1]) / 2;
+    valueOf = (r) => primaryOf(r) as number;
+    candRows = usable.filter(
+      (r) => valueOf(r) >= window[0] && valueOf(r) <= window[1],
+    );
+    if (candRows.length === 0) {
+      candRows = nearest(usable, valueOf, window);
+    } else if (candRows.length === 1 && fit) {
+      // Preferencja fasonu potrzebuje dwóch kandydatów. Gdy okno łapie tylko
+      // jeden rozmiar, dobierz najbliższego sąsiada (o ile jest tuż przy oknie),
+      // żeby „fitted"/„loose" miało czym operować.
+      const near = nearest(usable, valueOf, window);
+      if (near.length >= 2) candRows = near;
+    }
+  }
+
+  if (candRows.length === 0) return null;
+
+  let chosen = candRows[0];
+  let tieBrokenBy: ResolveResult["tieBrokenBy"] =
+    candRows.length === 1 ? "single" : null;
+
+  if (candRows.length > 1) {
+    // Wybór neutralny = najbliżej celu.
+    const byDist = [...candRows].sort(
+      (a, b) => Math.abs(valueOf(a) - target) - Math.abs(valueOf(b) - target),
+    );
+    const neutral = byDist[0];
+    const nIdx = candRows.indexOf(neutral);
+
+    if (fit === "fitted") {
+      // O jeden mniejszy niż neutralny (nie skacz na skraj listy kandydatów).
+      chosen = candRows[Math.max(0, nIdx - 1)];
+      tieBrokenBy = nIdx > 0 ? "fit" : "midpoint";
+    } else if (fit === "loose") {
+      chosen = candRows[Math.min(candRows.length - 1, nIdx + 1)];
+      tieBrokenBy = nIdx < candRows.length - 1 ? "fit" : "midpoint";
+    } else {
+      chosen = neutral;
+      // Remis (≤1 cm) w kroju regular/relaxed dla GÓRY → wybierz większy:
+      // za mały jest tam gorszym błędem niż za duży. Nie dotyczy dołu (pas).
+      if (
+        !useWaist &&
+        (cut === "regular" || cut === "relaxed") &&
+        byDist[1] &&
+        Math.abs(valueOf(byDist[1]) - target) -
+          Math.abs(valueOf(byDist[0]) - target) <=
+          0.5 &&
+        valueOf(byDist[1]) > valueOf(byDist[0])
+      ) {
+        chosen = byDist[1];
+      }
+      tieBrokenBy = "midpoint";
+    }
+
+    // Nogawka jako fallback: tylko jeśli wybrany rozmiar NIE trafia we wzrost,
+    // a inny kandydat trafia.
+    if (mode === "waist" && tieBrokenBy === "midpoint") {
+      const [ilo, ihi] = inseamBand(height);
+      const okInseam = (r: NormalizedSizeRow) =>
+        typeof r.inseam === "number" &&
+        (r.inseam as number) >= ilo &&
+        (r.inseam as number) <= ihi;
+      if (!okInseam(chosen)) {
+        const alt = candRows.find(okInseam);
+        if (alt) chosen = alt;
+      }
+    }
+  }
+
+  // Korekta ze stylu marki – przesunięcie po pełnej liście rozmiarów.
+  let korektaApplied: -1 | 0 | 1 = 0;
+  const k = extraction.korekta;
+  if (allowKorekta && (k === -1 || k === 1)) {
+    const ci = rows.findIndex((r) => r.size === chosen.size);
+    const ni = clamp(ci + k, 0, rows.length - 1);
+    if (ni !== ci) {
+      chosen = rows[ni];
+      korektaApplied = k;
+    }
+  }
+
+  // Podłoga obwodu: wybrany rozmiar musi FIZYCZNIE się zapiąć / obwód klatki
+  // musi mieć minimalny luz. Ratuje sytuacje, gdy kotwica/długość wskazały
+  // rozmiar za wąski dla tej sylwetki (np. niski + masywny). Dla kroju
+  // dopasowanego (slim/fitted) luz minimalny jest ujemny – ma przylegać.
+  {
+    const heavy = bodyType === "plus" ? 7 : bodyType === "athletic" ? 5 : 0;
+    const minEase =
+      cut === "slim"
+        ? -3 + Math.max(0, heavy - 3)
+        : cut === "regular"
+          ? 3 + heavy
+          : 2 + heavy; // relaxed / oversize – i tak jest luzu w nadmiarze
+    const ci = rows.findIndex((r) => r.size === chosen.size);
+    for (let i = ci; i < rows.length; i++) {
+      const r = rows[i];
+      if (useWaist) {
+        const w = r.waist;
+        if (!w) break;
+        // dzianina / guma rozciąga się ~30%; tkanina prawie wcale.
+        const give =
+          cut === "relaxed" || cut === "oversize" ? w * 0.3 : Math.max(3, w * 0.05);
+        if (w + give >= bodyPrimary) {
+          chosen = r;
+          break;
+        }
+      } else {
+        const c = r.chest;
+        if (!c) break;
+        if (c >= bodyPrimary + minEase) {
+          chosen = r;
+          break;
+        }
+      }
+      if (i === rows.length - 1) chosen = r; // nic nie pasuje → największy
+    }
+  }
+
+  const finalPrimary = useWaist ? chosen.waist : chosen.chest;
+  return {
+    size: chosen.size.toUpperCase().replace(/\s+/g, ""),
+    mode,
+    chosenValue: Math.round(
+      (mode === "length" ? valueOf(chosen) : (finalPrimary as number)) || 0,
+    ),
+    bodyPrimaryUsed: Math.round(bodyPrimary),
+    window: [Math.round(window[0]), Math.round(window[1])],
+    candidates: candRows.map((r) => r.size.toUpperCase().replace(/\s+/g, "")),
+    korektaApplied,
+    tieBrokenBy,
+    anchoredToModel,
+    modelRef:
+      anchoredToModel && extraction.modelHeight && extraction.modelSize
+        ? { height: extraction.modelHeight, size: extraction.modelSize }
+        : null,
+    matchedReference: null,
+  };
+}
+
+function nearest(
+  pool: NormalizedSizeRow[],
+  valueOf: (r: NormalizedSizeRow) => number,
+  [lo, hi]: [number, number],
+): NormalizedSizeRow[] {
+  if (pool.length === 0) return [];
+  const withDist = pool
+    .map((r) => {
+      const v = valueOf(r);
+      return { r, d: v < lo ? lo - v : v > hi ? v - hi : 0 };
+    })
+    .sort((a, b) => a.d - b.d);
+  const best = withDist[0].d;
+  return withDist
+    .filter((x) => x.d <= best + 2)
+    .slice(0, 2)
+    .map((x) => x.r);
+}
+
+// ---------------------------------------------------------------------------
+// Uzasadnienie z szablonu (PL/EN; inne języki → EN)
+// ---------------------------------------------------------------------------
+
+const CUT_LABEL: Record<string, Record<CutLooseness, string>> = {
+  pl: { slim: "obcisły", regular: "regularny", relaxed: "swobodny", oversize: "oversize" },
+  en: { slim: "slim", regular: "regular", relaxed: "relaxed", oversize: "oversize" },
+};
+
+// Przyjazna etykieta kroju do jednozdaniowego nagłówka dla kupującego.
+const CUT_HEADLINE: Record<string, Record<CutLooseness, string>> = {
+  pl: {
+    slim: "dopasowane",
+    regular: "klasyczne",
+    relaxed: "swobodne",
+    oversize: "luźne (oversize)",
+  },
+  en: { slim: "a fitted", regular: "a regular", relaxed: "a relaxed", oversize: "an oversized" },
+};
+
+export type Explanation = {
+  /** Jedno pewne zdanie dla kupującego — bez centymetrów i żargonu. */
+  headline: string;
+  /** Pełne uzasadnienie na liczbach — za „Dlaczego ten rozmiar?" / dla testera. */
+  detail: string;
+};
+
+function buildExplanation(
+  localeRaw: string | null | undefined,
+  r: ResolveResult,
+  ctx: {
+    height: number;
+    cut: CutLooseness;
+    bodyPrimaryLabel: number;
+    fit: FitPreference;
+    /** Klient podał ubranie referencyjne, ale nie dało się go użyć (nieznana
+     *  marka / niepewny model / wynik sprzeczny z obwodem). */
+    referenceUnused?: boolean;
+  },
+): Explanation {
+  const locale =
+    (localeRaw || "pl").toLowerCase().slice(0, 2) === "pl" ? "pl" : "en";
+  const cut = CUT_LABEL[locale][ctx.cut] ?? ctx.cut;
+  const cutHead = CUT_HEADLINE[locale][ctx.cut] ?? cut;
+  const [lo, hi] = r.window;
+  const parts: string[] = [];
+
+  const headline =
+    r.matchedReference
+      ? locale === "pl"
+        ? `Rozmiar ${r.size} — leży podobnie jak Twoje „${r.matchedReference.brand} ${r.matchedReference.size}".`
+        : `Size ${r.size} — fits like your “${r.matchedReference.brand} ${r.matchedReference.size}”.`
+      : r.anchoredToModel
+        ? locale === "pl"
+          ? `Rozmiar ${r.size} — dobrany do Twojego wzrostu wg wzorca marki.`
+          : `Size ${r.size} — matched to your height from the brand's reference.`
+        : locale === "pl"
+          ? `Rozmiar ${r.size} — ${cutHead} dopasowanie.`
+          : `Size ${r.size} — ${cutHead} fit.`;
+
+  if (locale === "pl") {
+    if (r.matchedReference) {
+      parts.push(
+        `Rozmiar ${r.size} — leży podobnie jak „${r.matchedReference.brand} ${r.matchedReference.size}", które u Ciebie pasuje.`,
+      );
+    } else if (r.anchoredToModel && r.modelRef) {
+      parts.push(
+        `Rozmiar ${r.size} wg wzorca marki: model ${r.modelRef.height} cm nosi ${r.modelRef.size}, skorygowano o Twój wzrost ${ctx.height} cm.`,
+      );
+    } else if (r.mode === "length") {
+      parts.push(
+        `Rozmiar ${r.size}: długość ${r.chosenValue} cm mieści się w zakresie ${lo}–${hi} cm zalecanym przy wzroście ${ctx.height} cm dla kroju ${cut}.`,
+      );
+    } else {
+      const where = r.mode === "waist" ? "w pasie" : "w klatce";
+      parts.push(
+        `Rozmiar ${r.size}: obwód ${where} ${r.chosenValue} cm przy Twoim ok. ${Math.round(ctx.bodyPrimaryLabel)} cm daje luz właściwy dla kroju ${cut}.`,
+      );
+    }
+    if (r.tieBrokenBy === "fit") {
+      parts.push(
+        ctx.fit === "loose"
+          ? "Wybrano większy z dwóch pasujących rozmiarów zgodnie z preferencją luźniejszego fasonu."
+          : "Wybrano mniejszy z dwóch pasujących rozmiarów zgodnie z preferencją dopasowanego fasonu.",
+      );
+    } else if (r.tieBrokenBy === "build") {
+      parts.push(
+        "Przy Twojej budowie wybrano większy z pasujących rozmiarów dla wygody.",
+      );
+    }
+    if (r.korektaApplied === -1)
+      parts.push("Zeszliśmy o rozmiar zgodnie z wytycznymi marki.");
+    if (r.korektaApplied === 1)
+      parts.push("Podnieśliśmy o rozmiar zgodnie z wytycznymi marki.");
+    if (ctx.referenceUnused && !r.matchedReference)
+      parts.push(
+        "Nie mieliśmy pewnych danych dla podanego ubrania, więc rozmiar policzyliśmy z Twoich wymiarów.",
+      );
+  } else {
+    if (r.matchedReference) {
+      parts.push(
+        `Size ${r.size} — fits like the “${r.matchedReference.brand} ${r.matchedReference.size}” that already works for you.`,
+      );
+    } else if (r.anchoredToModel && r.modelRef) {
+      parts.push(
+        `Size ${r.size} from the brand reference: a ${r.modelRef.height} cm model wears ${r.modelRef.size}, adjusted for your height of ${ctx.height} cm.`,
+      );
+    } else if (r.mode === "length") {
+      parts.push(
+        `Size ${r.size}: length ${r.chosenValue} cm is within the ${lo}–${hi} cm range recommended for a height of ${ctx.height} cm in a ${cut} fit.`,
+      );
+    } else {
+      const where = r.mode === "waist" ? "waist" : "chest";
+      parts.push(
+        `Size ${r.size}: ${where} ${r.chosenValue} cm over your ~${Math.round(ctx.bodyPrimaryLabel)} cm gives the ease expected for a ${cut} fit.`,
+      );
+    }
+    if (r.tieBrokenBy === "fit") {
+      parts.push(
+        ctx.fit === "loose"
+          ? "Picked the larger of two fitting sizes for the looser fit you selected."
+          : "Picked the smaller of two fitting sizes for the closer fit you selected.",
+      );
+    } else if (r.tieBrokenBy === "build") {
+      parts.push(
+        "Given your build, the larger of the fitting sizes was chosen for comfort.",
+      );
+    }
+    if (r.korektaApplied === -1)
+      parts.push("Sized down one step per the brand's guidance.");
+    if (r.korektaApplied === 1)
+      parts.push("Sized up one step per the brand's guidance.");
+    if (ctx.referenceUnused && !r.matchedReference)
+      parts.push(
+        "We didn't have reliable data for the garment you entered, so the size was calculated from your measurements.",
+      );
+  }
+
+  return { headline, detail: parts.join(" ") };
+}
+
+// ---------------------------------------------------------------------------
+// Wywołanie modelu
+// ---------------------------------------------------------------------------
+
+export type AICallInput = {
+  model: string;
+  prompt: string;
+  sizeChartImage?: string | null;
+  decision: {
+    height: number | string;
+    weight: number | string;
+    gender?: string | null;
+    bodyType?: string | null;
+    fit?: FitPreference;
+    locale?: string | null;
+    /** true → wolno zastosować korektę rozmiaru ze stylu marki / notatek. */
+    allowKorekta?: boolean;
+    /** Dobrze leżące ubranie referencyjne podane przez klienta. */
+    referenceGarment?: { brand: string; size: string } | null;
+  };
+};
+
+export type AICallResult = {
+  size: string;
+  /** Jedno zdanie dla kupującego (bez centymetrów i żargonu). */
+  explanation: string;
+  /** Pełne uzasadnienie na liczbach — za „Dlaczego ten rozmiar?" / dla testera. */
+  explanationDetail: string;
+  /** "chart" = rozmiar policzony z tabeli; "estimate" = model zgadł (brak tabeli). */
+  source: "chart" | "estimate";
+  attachedImage: boolean;
+  promptTokenCount: number | null;
+  candidatesTokenCount: number | null;
+  /** Surowy JSON modelu (ekstrakcja produktu) — do zapisania na ProductRule i
+   *  ponownego użycia bez wołania AI. Puste, gdy w prompt weszło ubranie
+   *  referencyjne klienta (wtedy JSON jest „skażony” i nie zapisujemy go). */
+  rawJson: Record<string, unknown>;
+};
+
+function parseModelJson(raw: string): Record<string, unknown> {
+  const cleaned = (raw || "{}").replace(/```json/g, "").replace(/```/g, "").trim();
+  try {
+    const v = JSON.parse(cleaned);
+    return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
+  } catch {
+    throw new AICallError("invalid JSON from model");
+  }
+}
+
+function num(v: unknown): number | null {
+  const n =
+    typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : NaN;
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function parseExtraction(json: Record<string, unknown>): ChartExtraction {
+  const rawRows = Array.isArray(json.tabela) ? (json.tabela as unknown[]) : [];
+  const rows: NormalizedSizeRow[] = rawRows
+    .map((r) => {
+      if (!r || typeof r !== "object") return null;
+      const o = r as Record<string, unknown>;
+      const size = String(o.rozmiar ?? o.size ?? "").trim();
+      if (!size) return null;
+      return {
+        size,
+        chest: num(o.obwodKlatki ?? o.chest),
+        waist: num(o.obwodPasa ?? o.waist),
+        hip: num(o.obwodBioder ?? o.hip),
+        length: num(o.dlugosc ?? o.length),
+        inseam: num(o.dlugoscNogawki ?? o.inseam),
+      } as NormalizedSizeRow;
+    })
+    .filter((r): r is NormalizedSizeRow => r !== null);
+
+  const kat = String(json.kategoria ?? "").toLowerCase();
+  const category: GarmentCategory =
+    kat === "dol" || kat === "bottom"
+      ? "bottom"
+      : kat === "sukienka" || kat === "dress"
+        ? "dress"
+        : "top";
+
+  const luz = String(json.krojLuz ?? json.cut ?? "").toLowerCase();
+  const cut: CutLooseness =
+    luz === "obcisly" || luz === "slim"
+      ? "slim"
+      : luz === "swobodny" || luz === "relaxed" || luz === "loose"
+        ? "relaxed"
+        : luz === "oversize" || luz === "boxy"
+          ? "oversize"
+          : "regular";
+
+  const korRaw = Number(json.korektaRozmiaru ?? json.korekta ?? 0);
+  const korekta: -1 | 0 | 1 = korRaw <= -1 ? -1 : korRaw >= 1 ? 1 : 0;
+
+  const bool = (v: unknown, dflt: boolean) =>
+    typeof v === "boolean" ? v : v === "true" ? true : v === "false" ? false : dflt;
+
+  const mSize =
+    typeof json.modelRozmiar === "string" && json.modelRozmiar.trim()
+      ? json.modelRozmiar.trim()
+      : null;
+
+  return {
+    rows,
+    category,
+    cut,
+    bodyChest: num(json.obwodKlatkiKlienta ?? json.bodyChest),
+    bodyWaist: num(json.obwodPasaKlienta ?? json.bodyWaist),
+    bodyHip: num(json.obwodBioderKlienta ?? json.bodyHip),
+    korekta,
+    stretch: bool(json.dzianina ?? json.stretch, true),
+    elasticWaist: bool(json.pasNaGumce ?? json.elasticWaist, false),
+    outerwear: bool(json.odziezWierzchnia ?? json.outerwear, false),
+    modelHeight: num(json.modelWzrost ?? json.modelHeight),
+    modelSize: mSize,
+    refEquivalentSize:
+      typeof json.refRozmiarWTabeli === "string" && json.refRozmiarWTabeli.trim()
+        ? json.refRozmiarWTabeli.trim()
+        : null,
+    fallbackSize:
+      typeof json.zapasowyRozmiar === "string" && json.zapasowyRozmiar.trim()
+        ? json.zapasowyRozmiar.trim()
+        : null,
+    fallbackExplanation:
+      typeof json.zapasoweUzasadnienie === "string"
+        ? json.zapasoweUzasadnienie.trim()
+        : null,
+  };
+}
+
+// Wersja logiki ekstrakcji/klasyfikacji. Bump = zapisane ekstrakcje na
+// ProductRule uznajemy za nieaktualne i przeliczamy leniwie przy zapytaniu.
+export const EXTRACTION_VERSION = 1;
+
+/** Czysta decyzja rozmiaru z gotowej ekstrakcji — bez wołania AI.
+ *  Używane, gdy produkt ma już zapisaną analizę (config-time). */
+export function decideSize(
+  extraction: ChartExtraction,
+  d: AICallInput["decision"],
+): Omit<AICallResult, "attachedImage" | "promptTokenCount" | "candidatesTokenCount" | "rawJson"> {
+  const height = Number(d.height) || 0;
+  const weight = Number(d.weight) || 0;
+  const gender = (d.gender as string) || "male";
+  const bodyType = (d.bodyType as string) || "standard";
+  const fit: FitPreference =
+    d.fit === "fitted" || d.fit === "loose" ? d.fit : null;
+
+  const resolved =
+    height > 0
+      ? resolveSize({
+          extraction,
+          height,
+          weight,
+          gender,
+          bodyType,
+          fit,
+          allowKorekta: d.allowKorekta === true,
+          referenceGarment: d.referenceGarment ?? null,
+        })
+      : null;
+
+  if (resolved) {
+    const { headline, detail } = buildExplanation(d.locale, resolved, {
+      height,
+      cut: extraction.cut,
+      bodyPrimaryLabel: resolved.bodyPrimaryUsed,
+      fit,
+      referenceUnused:
+        Boolean(d.referenceGarment) && !resolved.matchedReference,
+    });
+    return {
+      size: resolved.size,
+      explanation: headline,
+      explanationDetail: detail,
+      source: "chart",
+    };
+  }
+
+  // Brak tabeli → rozmiar liczymy deterministycznie z obwodu ciała (model przy
+  // braku tabeli i tak zawsze zgaduje „M"). Nagłówek krótki, szczegóły uczciwe.
+  const size =
+    height > 0
+      ? estimateLetterSize(height, weight, gender, bodyType, fit)
+      : (extraction.fallbackSize || "M").toUpperCase().replace(/\s+/g, "");
+  const isPl = (d.locale || "pl").toLowerCase().slice(0, 2) === "pl";
+  const headline = isPl
+    ? `Rozmiar ${size} — oszacowany na podstawie Twoich wymiarów.`
+    : `Size ${size} — estimated from your measurements.`;
+  const detail = isPl
+    ? `Ten produkt nie ma tabeli rozmiarów, więc rozmiar ${size} oszacowaliśmy z Twojego wzrostu (${Math.round(height)} cm), wagi (${Math.round(weight)} kg) i budowy${fit === "loose" ? " oraz preferencji luźniejszego fasonu" : ""}. Dla pewności sprawdź rozmiarówkę przy produkcie.`
+    : `This product has no size chart, so size ${size} is estimated from your height (${Math.round(height)} cm), weight (${Math.round(weight)} kg) and build${fit === "loose" ? ", plus your looser fit preference" : ""}. Please double-check the product's own size guide.`;
+  return {
+    size,
+    explanation: headline,
+    explanationDetail: height > 0 ? detail : headline,
+    source: "estimate",
+  };
+}
+
+/** Wspólne złożenie: model → ekstrakcja → decyzja kodu → uzasadnienie. */
+export async function callAI(input: AICallInput): Promise<AICallResult> {
+  const raw =
+    getAIConfig().provider === "gemini"
+      ? await callGeminiRaw(input)
+      : await callOpenAIRaw(input);
+
+  const extraction = parseExtraction(raw.json);
+  const decided = decideSize(extraction, input.decision);
+
+  return {
+    ...decided,
+    attachedImage: raw.attachedImage,
+    promptTokenCount: raw.promptTokenCount,
+    candidatesTokenCount: raw.candidatesTokenCount,
+    rawJson: raw.json,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Jednorazowa analiza produktu (config-time) — odczyt tabeli + klasyfikacja
+// bez danych klienta. Wynik zapisujemy na ProductRule i używamy potem bez AI.
+// ---------------------------------------------------------------------------
+
+export type ExtractProductInput = {
+  productTitle?: string | null;
+  productDescription?: string | null;
+  brandStyleNotes?: string | null;
+  productSizeData?: string | null;
+  productNotes?: string | null;
+  sizeChartImage?: string | null;
+  hasSizeChartImage?: boolean;
+  responseLanguage?: string | null;
+};
+
+export type ExtractProductResult = {
+  extraction: ChartExtraction;
+  rawJson: Record<string, unknown>;
+  attachedImage: boolean;
+  promptTokenCount: number | null;
+  candidatesTokenCount: number | null;
+};
+
+export async function extractProductChart(
+  model: string,
+  input: ExtractProductInput,
+): Promise<ExtractProductResult> {
+  const prompt = buildSizeAdvisorPrompt({
+    productTitle: input.productTitle,
+    productDescription: input.productDescription,
+    brandStyleNotes: input.brandStyleNotes,
+    productSizeData: input.productSizeData,
+    productNotes: input.productNotes,
+    hasSizeChartImage: input.hasSizeChartImage,
+    responseLanguage: input.responseLanguage,
+    omitShopper: true,
+  });
+
+  const raw =
+    getAIConfig().provider === "gemini"
+      ? await callGeminiRaw({ model, prompt, sizeChartImage: input.sizeChartImage })
+      : await callOpenAIRaw({ model, prompt, sizeChartImage: input.sizeChartImage });
+
+  return {
+    extraction: parseExtraction(raw.json),
+    rawJson: raw.json,
+    attachedImage: raw.attachedImage,
+    promptTokenCount: raw.promptTokenCount,
+    candidatesTokenCount: raw.candidatesTokenCount,
+  };
+}
+
+/** Odtwarza ChartExtraction z JSON-a zapisanego na ProductRule.extractionJson. */
+export function parseStoredExtraction(json: string | null | undefined): ChartExtraction | null {
+  if (!json) return null;
+  try {
+    const obj = JSON.parse(json);
+    if (!obj || typeof obj !== "object") return null;
+    return parseExtraction(obj as Record<string, unknown>);
+  } catch {
+    return null;
+  }
+}
+
+/** Zwięzły, czytelny dla admina opis tego, co model zrozumiał z produktu. */
+export function describeExtraction(e: ChartExtraction): {
+  category: GarmentCategory;
+  cut: CutLooseness;
+  rowCount: number;
+  sizes: string[];
+  stretch: boolean;
+  elasticWaist: boolean;
+  outerwear: boolean;
+  korekta: -1 | 0 | 1;
+  modelAnchor: { height: number; size: string } | null;
+  hasMeasurements: boolean;
+} {
+  return {
+    category: e.category,
+    cut: e.cut,
+    rowCount: e.rows.length,
+    sizes: e.rows.map((r) => r.size),
+    stretch: e.stretch,
+    elasticWaist: e.elasticWaist,
+    outerwear: e.outerwear,
+    korekta: e.korekta,
+    modelAnchor:
+      e.modelHeight && e.modelSize
+        ? { height: e.modelHeight, size: e.modelSize }
+        : null,
+    hasMeasurements: e.rows.some(
+      (r) => r.chest != null || r.waist != null || r.hip != null || r.length != null,
+    ),
+  };
+}
+
+type RawModelResult = {
+  json: Record<string, unknown>;
+  attachedImage: boolean;
+  promptTokenCount: number | null;
+  candidatesTokenCount: number | null;
+};
+
+/** Raw funkcje modelu potrzebują tylko modelu, promptu i (opcjonalnie) zdjęcia. */
+type RawModelInput = {
+  model: string;
+  prompt: string;
+  sizeChartImage?: string | null;
+};
+
+async function callOpenAIRaw(input: RawModelInput): Promise<RawModelResult> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new AICallError("OPENAI_API_KEY not set");
+
+  const client = new OpenAI({ apiKey });
+  const imageMatch = input.sizeChartImage?.match(SIZE_CHART_IMAGE_RE);
+
+  const content: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
+    { type: "text", text: input.prompt },
+  ];
+  if (imageMatch && input.sizeChartImage) {
+    // "high" – tabela rozmiarów bywa drobna; w niskiej rozdzielczości model myli
+    // wartości większych rozmiarów. To jest jedyne zadanie modelu, więc warto.
+    content.push({
+      type: "image_url",
+      image_url: { url: input.sizeChartImage, detail: "high" },
+    });
+  }
+
+  try {
+    const resp = await client.chat.completions.create({
+      model: input.model,
+      temperature: 0,
+      response_format: { type: "json_object" },
+      messages: [{ role: "user", content }],
+    });
+    return {
+      json: parseModelJson(resp.choices[0]?.message?.content ?? "{}"),
+      attachedImage: Boolean(imageMatch),
+      promptTokenCount: resp.usage?.prompt_tokens ?? null,
+      candidatesTokenCount: resp.usage?.completion_tokens ?? null,
+    };
+  } catch (err) {
+    if (err instanceof OpenAI.APIError) {
+      console.error("OpenAI API Error:", err.status, err.message);
+      if (err.status === 429 || err.status === 503) throw new AIQuotaError();
+      throw new AICallError(`status ${err.status}`);
+    }
+    throw err;
+  }
+}
+
+async function callGeminiRaw(input: RawModelInput): Promise<RawModelResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new AICallError("GEMINI_API_KEY not set");
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${input.model}:generateContent?key=${apiKey}`;
+
+  const parts: Array<Record<string, unknown>> = [{ text: input.prompt }];
+  const imageMatch = input.sizeChartImage?.match(SIZE_CHART_IMAGE_RE);
+  if (imageMatch) {
+    parts.push({ inline_data: { mime_type: imageMatch[1], data: imageMatch[2] } });
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: {
+        temperature: 0,
+        topP: 0,
+        responseMimeType: "application/json",
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Google AI HTTP Error:", response.status, errorText);
+    if (response.status === 429 || response.status === 503) throw new AIQuotaError();
+    throw new AICallError(`status ${response.status}`);
+  }
+
+  const body = await response.json();
+  return {
+    json: parseModelJson(body.candidates?.[0]?.content?.parts?.[0]?.text || "{}"),
+    attachedImage: Boolean(imageMatch),
+    promptTokenCount: body.usageMetadata?.promptTokenCount ?? null,
+    candidatesTokenCount: body.usageMetadata?.candidatesTokenCount ?? null,
+  };
+}

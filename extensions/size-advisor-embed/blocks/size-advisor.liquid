@@ -1,0 +1,1113 @@
+{%- liquid
+  assign sa_accent = block.settings.accent | default: '#111111'
+  assign sa_bg = block.settings.bg_color | default: '#111111'
+  assign sa_fg = block.settings.text_color | default: '#ffffff'
+  assign sa_bg_h = block.settings.bg_color_hover
+  assign sa_label = block.settings.trigger_label
+  assign sa_width = block.settings.button_width | default: 'full'
+  assign sa_hover = block.settings.hover_effect | default: 'fade'
+  assign sa_align = block.settings.button_align | default: 'flex-start'
+  assign sa_custom_w = block.settings.custom_width | default: 0
+  assign sa_modal_title = block.settings.modal_title
+  assign sa_modal_subtitle = block.settings.modal_subtitle
+-%}
+
+<div
+  class="sa-root sa-w-{{ sa_width }} sa-hover-{{ sa_hover }}{% if sa_custom_w > 0 %} sa-fixed-w{% endif %}"
+  id="sa-root-{{ block.id }}"
+  style="
+    --sa-accent: {{ sa_accent }};
+    --sa-btn-bg: {{ sa_bg }};
+    --sa-btn-fg: {{ sa_fg }};
+    {% if sa_bg_h != blank %}--sa-btn-bg-h: {{ sa_bg_h }};{% endif %}
+    --sa-btn-fs: {{ block.settings.font_size | default: 15 }}px;
+    --sa-btn-fw: {{ block.settings.font_weight | default: '600' }};
+    --sa-btn-py: {{ block.settings.padding_y | default: 13 }}px;
+    --sa-btn-px: {{ block.settings.padding_x | default: 22 }}px;
+    --sa-btn-radius: {{ block.settings.corner_radius | default: 8 }}px;
+    --sa-btn-bw: {{ block.settings.border_width | default: 0 }}px;
+    --sa-btn-bc: {{ block.settings.border_color | default: '#111111' }};
+    --sa-btn-space: {{ block.settings.spacing | default: 15 }}px;
+    --sa-btn-justify: {{ sa_align }};
+    --sa-btn-w: {{ sa_custom_w }}px;
+  "
+>
+  <div class="size-advisor-container" id="size-advisor-container" hidden>
+    <button type="button" id="size-advisor-btn" class="size-advisor-trigger">
+      {% if block.settings.show_icon != false %}
+        <span class="sa-trigger-icon" aria-hidden="true">{{ block.settings.icon_char | default: '📏' }}</span>
+      {% endif %}
+      <span>{% if sa_label != blank %}{{ sa_label }}{% else %}{{ 'size_advisor.trigger' | t }}{% endif %}</span>
+    </button>
+  </div>
+
+  <div
+    id="size-advisor-modal"
+    class="size-advisor-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="sa-modal-title-{{ block.id }}"
+  >
+    <div class="size-advisor-modal-content" tabindex="-1">
+      <button type="button" id="size-advisor-close" class="size-advisor-close" data-i18n-aria="close" aria-label="{{ 'size_advisor.close' | t }}">&times;</button>
+      <button type="button" id="sa-lang-toggle" class="sa-lang-toggle" hidden>
+        <span aria-hidden="true">🌐</span><span class="sa-lang-code">ENG</span>
+      </button>
+      <h3 class="size-advisor-title" id="sa-modal-title-{{ block.id }}"{% if sa_modal_title == blank %} data-i18n="modal_title"{% endif %}>{% if sa_modal_title != blank %}{{ sa_modal_title }}{% else %}{{ 'size_advisor.modal_title' | t }}{% endif %}</h3>
+      <p class="size-advisor-desc"{% if sa_modal_subtitle == blank %} data-i18n="modal_desc"{% endif %}>{% if sa_modal_subtitle != blank %}{{ sa_modal_subtitle }}{% else %}{{ 'size_advisor.modal_desc' | t }}{% endif %}</p>
+
+      <div class="size-advisor-form">
+        <span class="sa-label" id="sa-gender-label-{{ block.id }}" data-i18n="gender">{{ 'size_advisor.gender' | t }}</span>
+        <div class="sa-pill-group sa-pill-group--2" id="sa-gender-group" role="group" aria-labelledby="sa-gender-label-{{ block.id }}">
+          <button type="button" class="sa-pill-btn active" data-value="male" aria-pressed="true" data-i18n="gender_male">{{ 'size_advisor.gender_male' | t }}</button>
+          <button type="button" class="sa-pill-btn" data-value="female" aria-pressed="false" data-i18n="gender_female">{{ 'size_advisor.gender_female' | t }}</button>
+        </div>
+
+        <div class="sa-grid-inputs">
+          <div class="sa-input-col">
+            <label class="sa-label" for="user-height" data-i18n="height">{{ 'size_advisor.height' | t }}</label>
+            <input type="number" id="user-height" inputmode="numeric" data-i18n-ph="height_ph" placeholder="{{ 'size_advisor.height_ph' | t }}" min="140" max="215">
+          </div>
+          <div class="sa-input-col">
+            <label class="sa-label" for="user-weight" data-i18n="weight">{{ 'size_advisor.weight' | t }}</label>
+            <input type="number" id="user-weight" inputmode="numeric" data-i18n-ph="weight_ph" placeholder="{{ 'size_advisor.weight_ph' | t }}" min="40" max="180">
+          </div>
+        </div>
+
+        <span class="sa-label" id="sa-body-label-{{ block.id }}" data-i18n="body">{{ 'size_advisor.body' | t }}</span>
+        <div class="sa-pill-group sa-pill-group--2" id="sa-body-group" role="group" aria-labelledby="sa-body-label-{{ block.id }}">
+          <button type="button" class="sa-pill-btn" data-value="slim" aria-pressed="false" data-i18n="body_slim">{{ 'size_advisor.body_slim' | t }}</button>
+          <button type="button" class="sa-pill-btn active" data-value="standard" aria-pressed="true" data-i18n="body_standard">{{ 'size_advisor.body_standard' | t }}</button>
+          <button type="button" class="sa-pill-btn" data-value="athletic" aria-pressed="false" data-i18n="body_athletic">{{ 'size_advisor.body_athletic' | t }}</button>
+          <button type="button" class="sa-pill-btn" data-value="plus" aria-pressed="false" data-i18n="body_plus">{{ 'size_advisor.body_plus' | t }}</button>
+        </div>
+
+        <div id="sa-fit-wrap" hidden>
+          <span class="sa-label" id="sa-fit-label-{{ block.id }}" data-i18n="fit">{{ 'size_advisor.fit' | t }}</span>
+          <div class="sa-pill-group sa-pill-group--3" id="sa-fit-group" role="group" aria-labelledby="sa-fit-label-{{ block.id }}">
+            <button type="button" class="sa-pill-btn" data-value="fitted" aria-pressed="false" data-i18n="fit_fitted">{{ 'size_advisor.fit_fitted' | t }}</button>
+            <button type="button" class="sa-pill-btn active" data-value="regular" aria-pressed="true" data-i18n="fit_regular">{{ 'size_advisor.fit_regular' | t }}</button>
+            <button type="button" class="sa-pill-btn" data-value="loose" aria-pressed="false" data-i18n="fit_loose">{{ 'size_advisor.fit_loose' | t }}</button>
+          </div>
+        </div>
+
+        <div id="sa-garment-wrap" hidden>
+          <button type="button" id="sa-garment-toggle" class="sa-garment-toggle" aria-expanded="false" aria-controls="sa-garment-fields" data-i18n="garment_toggle">
+            {{ 'size_advisor.garment_toggle' | t }}
+          </button>
+          <div id="sa-garment-fields" class="sa-garment-fields" hidden>
+            <div class="sa-grid-inputs">
+              <div class="sa-input-col">
+                <label class="sa-label" for="sa-ref-brand" data-i18n="garment_brand">{{ 'size_advisor.garment_brand' | t }}</label>
+                <input type="text" id="sa-ref-brand" autocomplete="off" data-i18n-ph="garment_brand_ph" placeholder="{{ 'size_advisor.garment_brand_ph' | t }}">
+              </div>
+              <div class="sa-input-col">
+                <label class="sa-label" for="sa-ref-size" data-i18n="garment_size">{{ 'size_advisor.garment_size' | t }}</label>
+                <input type="text" id="sa-ref-size" autocomplete="off" data-i18n-ph="garment_size_ph" placeholder="{{ 'size_advisor.garment_size_ph' | t }}">
+              </div>
+            </div>
+            <p class="sa-garment-hint" data-i18n="garment_hint">{{ 'size_advisor.garment_hint' | t }}</p>
+          </div>
+        </div>
+
+        <button type="button" id="get-recommendation-btn">
+          <span class="sa-btn-label" data-i18n="calc">{{ 'size_advisor.calc' | t }}</span>
+        </button>
+      </div>
+
+      <div id="size-advisor-result" class="sa-result" role="status" aria-live="polite" hidden></div>
+      <div id="sa-cart-action" class="sa-cart-action" hidden></div>
+      <p id="sa-powered-by" class="sa-powered-by" hidden>Size Advisor</p>
+    </div>
+  </div>
+</div>
+
+<style>
+  {%- if block.settings.button_font -%}
+    {{ block.settings.button_font | font_face: font_display: 'swap' }}
+    #sa-root-{{ block.id }} {
+      --sa-btn-ff: {{ block.settings.button_font.family }}, {{ block.settings.button_font.fallback_families }};
+    }
+  {%- endif -%}
+  .sa-root {
+    /* Wspólne zaokrąglenie — pola/pigułki/wynik idą za ustawieniem przycisku,
+       ale przycięte do 16px, żeby inputy nie robiły się przesadnie okrągłe. */
+    --sa-radius: clamp(0px, var(--sa-btn-radius, 8px), 16px);
+    --sa-border: #d9dce1;
+    --sa-muted: #6b7280;
+    --sa-bg-soft: #f6f7f9;
+  }
+  .sa-root * { box-sizing: border-box; }
+  /* Niektóre elementy mają własne `display:` (flex/inline-flex), co bije atrybut
+     [hidden] z UA-stylesheet. Bez tego: wyłączenie apki nie chowa przycisku,
+     przełącznik języka pokazuje się mimo braku uprawnień itd. */
+  .sa-root [hidden] { display: none !important; }
+
+  .size-advisor-container {
+    margin: var(--sa-btn-space, 15px) 0;
+    display: flex;
+    justify-content: var(--sa-btn-justify, flex-start);
+  }
+  .sa-root:not(.sa-fixed-w).sa-w-full .size-advisor-trigger { width: 100%; }
+  .sa-root:not(.sa-fixed-w).sa-w-inline .size-advisor-trigger { width: auto; }
+  .sa-fixed-w .size-advisor-trigger { width: var(--sa-btn-w); }
+
+  .size-advisor-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    max-width: 100%;
+    background-color: var(--sa-btn-bg, #111);
+    color: var(--sa-btn-fg, #fff);
+    padding: var(--sa-btn-py, 13px) var(--sa-btn-px, 22px);
+    border: var(--sa-btn-bw, 0px) solid var(--sa-btn-bc, #111);
+    cursor: pointer;
+    border-radius: var(--sa-btn-radius, 8px);
+    font-family: var(--sa-btn-ff, inherit);
+    font-weight: var(--sa-btn-fw, 600);
+    font-size: var(--sa-btn-fs, 15px);
+    line-height: 1.2;
+    transition: transform 0.12s ease, box-shadow 0.16s ease, opacity 0.16s ease,
+      background-color 0.16s ease, color 0.16s ease;
+  }
+  .size-advisor-trigger:hover {
+    background-color: var(--sa-btn-bg-h, var(--sa-btn-bg, #111));
+  }
+  .sa-hover-fade .size-advisor-trigger:hover { opacity: 0.9; }
+  .sa-hover-lift .size-advisor-trigger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+  }
+  .sa-hover-shadow .size-advisor-trigger:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.22); }
+  .size-advisor-trigger:active { transform: translateY(1px); }
+  .sa-trigger-icon { font-size: 1.05em; }
+
+  .size-advisor-modal {
+    position: fixed;
+    z-index: 2147483000;
+    inset: 0;
+    background-color: rgba(17,19,24,0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.18s ease, visibility 0s linear 0.18s;
+  }
+  .size-advisor-modal.is-open {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.18s ease;
+  }
+
+  .size-advisor-modal-content {
+    background: #fff;
+    color: #1f2430;
+    padding: 26px;
+    border-radius: calc(var(--sa-btn-radius, 8px) + 6px);
+    max-width: 440px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.28);
+    font-family: inherit;
+    transform: translateY(12px) scale(0.98);
+    transition: transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1);
+    outline: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .size-advisor-modal.is-open .size-advisor-modal-content { transform: translateY(0) scale(1); }
+
+  .size-advisor-close {
+    position: absolute;
+    right: 12px;
+    top: 8px;
+    width: 34px;
+    height: 34px;
+    font-size: 24px;
+    line-height: 1;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: #9aa0aa;
+    border-radius: 50%;
+    transition: background 0.14s ease, color 0.14s ease;
+  }
+  .size-advisor-close:hover { background: var(--sa-bg-soft); color: #1f2430; }
+
+  .sa-lang-toggle {
+    position: absolute;
+    right: 52px;
+    top: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 26px;
+    padding: 0 8px;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: #6b7280;
+    background: transparent;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: color 0.14s ease, border-color 0.14s ease;
+  }
+  .sa-lang-toggle:hover { color: #1f2430; border-color: #d1d5db; }
+  .sa-lang-code { line-height: 1; }
+
+  .size-advisor-title { margin: 0 4px 6px 0; font-size: 20px; font-weight: 700; }
+  .size-advisor-desc { margin: 0 0 16px 0; font-size: 13px; color: var(--sa-muted); line-height: 1.45; }
+
+  .sa-label {
+    display: block;
+    margin: 14px 0 6px 0;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #4b5563;
+  }
+
+  .sa-pill-group { display: grid; gap: 6px; }
+  .sa-pill-group--2 { grid-template-columns: repeat(2, 1fr); }
+  .sa-pill-group--3 { grid-template-columns: repeat(3, 1fr); }
+
+  .sa-pill-btn {
+    padding: 10px 8px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid var(--sa-border);
+    background: #fff;
+    border-radius: var(--sa-radius);
+    cursor: pointer;
+    text-align: center;
+    color: #1f2430;
+    transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease, transform 0.1s ease;
+  }
+  .sa-pill-btn:hover { border-color: var(--sa-accent); }
+  .sa-pill-btn:active { transform: translateY(1px); }
+  .sa-pill-btn.active {
+    background: var(--sa-accent);
+    color: #fff;
+    border-color: var(--sa-accent);
+  }
+
+  .sa-grid-inputs { display: flex; gap: 12px; }
+  .sa-input-col { flex: 1; }
+  .sa-input-col input {
+    width: 100%;
+    padding: 11px 12px;
+    font-size: 15px;
+    border: 1px solid var(--sa-border);
+    border-radius: var(--sa-radius);
+    background: #fff;
+    color: #1f2430;
+    transition: border-color 0.14s ease, box-shadow 0.14s ease;
+  }
+  .sa-input-col input:focus {
+    outline: none;
+    border-color: var(--sa-accent);
+    box-shadow: 0 0 0 3px rgba(17,19,24,0.08);
+  }
+
+  #sa-garment-wrap { margin-top: 14px; }
+  .sa-garment-toggle {
+    border: none;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    color: var(--sa-accent);
+    font-size: 13px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .sa-garment-toggle::after {
+    content: "›";
+    display: inline-block;
+    transition: transform 0.15s ease;
+    font-size: 15px;
+  }
+  .sa-garment-toggle[aria-expanded="true"]::after { transform: rotate(90deg); }
+  .sa-garment-fields { margin-top: 8px; }
+  .sa-garment-hint { margin: 6px 0 0; font-size: 12px; color: var(--sa-muted); line-height: 1.4; }
+
+  #get-recommendation-btn {
+    position: relative;
+    width: 100%;
+    padding: 13px;
+    margin-top: 18px;
+    background: var(--sa-accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--sa-radius);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.16s ease, transform 0.1s ease;
+  }
+  #get-recommendation-btn:hover { opacity: 0.92; }
+  #get-recommendation-btn:active { transform: translateY(1px); }
+  #get-recommendation-btn[disabled] { opacity: 0.75; cursor: default; }
+  #get-recommendation-btn.is-loading .sa-btn-label { visibility: hidden; }
+  #get-recommendation-btn.is-loading::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: sa-spin 0.7s linear infinite;
+  }
+  @keyframes sa-spin { to { transform: rotate(360deg); } }
+
+  .sa-result {
+    margin-top: 18px;
+    padding: 13px 15px;
+    border-radius: var(--sa-radius);
+    background: var(--sa-bg-soft);
+    border-left: 4px solid var(--sa-accent);
+    font-size: 14px;
+    line-height: 1.45;
+    animation: sa-fade-in 0.22s ease both;
+  }
+  .sa-result--loading { color: var(--sa-muted); display: flex; align-items: center; gap: 9px; }
+  .sa-result--loading::before {
+    content: "";
+    width: 15px; height: 15px;
+    border: 2px solid var(--sa-border);
+    border-top-color: var(--sa-accent);
+    border-radius: 50%;
+    animation: sa-spin 0.7s linear infinite;
+    flex: none;
+  }
+  .sa-result--ok .sa-result-size { font-size: 16px; font-weight: 700; }
+  .sa-result--ok .sa-result-why { color: #4b5563; font-size: 13px; margin-top: 5px; display: block; }
+  .sa-why-toggle {
+    margin-top: 8px;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--sa-accent, #4b5563);
+    font: inherit;
+    font-size: 12px;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .sa-why-detail {
+    display: block;
+    margin-top: 6px;
+    color: var(--sa-muted, #6b7280);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .sa-why-detail[hidden] { display: none; }
+  .sa-result--err {
+    background: #fef2f2;
+    border-left-color: #dc2626;
+    color: #b42318;
+  }
+  @keyframes sa-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .sa-cart-action { margin-top: 14px; animation: sa-cart-in 0.28s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+  @keyframes sa-cart-in { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: none; } }
+  .sa-add-to-cart {
+    position: relative;
+    width: 100%;
+    padding: 14px;
+    background: var(--sa-accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--sa-radius);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    overflow: hidden;
+    transition: opacity 0.16s ease, transform 0.1s ease, box-shadow 0.2s ease;
+    animation: sa-cart-glow 2s ease-out 1;
+  }
+  /* delikatny błysk – smuga światła przejeżdża raz po przycisku */
+  .sa-add-to-cart::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -60%;
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    transform: skewX(-18deg);
+    animation: sa-cart-shine 1.15s ease-out 0.25s 1;
+  }
+  @keyframes sa-cart-shine {
+    from { left: -60%; }
+    to { left: 130%; }
+  }
+  @keyframes sa-cart-glow {
+    0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--sa-accent) 45%, transparent); }
+    70% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--sa-accent) 0%, transparent); }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
+  .sa-add-to-cart:hover { opacity: 0.94; box-shadow: 0 4px 14px color-mix(in srgb, var(--sa-accent) 35%, transparent); }
+  .sa-add-to-cart:active { transform: translateY(1px); }
+  .sa-add-to-cart:disabled { opacity: 0.6; cursor: default; animation: none; box-shadow: none; }
+  .sa-add-to-cart:disabled::after { display: none; }
+  .sa-cart-note { font-size: 13px; color: #4b5563; line-height: 1.45; margin: 8px 0 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .sa-cart-action, .sa-add-to-cart { animation: none !important; }
+    .sa-add-to-cart::after { display: none; }
+  }
+  .sa-cart-done { font-size: 14px; font-weight: 700; color: #047857; margin: 0; }
+  .sa-cart-done a { display: inline-block; margin-top: 4px; font-weight: 600; color: var(--sa-accent); }
+
+  .sa-powered-by {
+    margin: 14px 0 0 0;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: #b6bcc6;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 400px) {
+    .size-advisor-modal-content { padding: 22px 18px; }
+    .sa-pill-btn { padding: 10px 4px; font-size: 12px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sa-root *, .size-advisor-modal, .size-advisor-modal-content { transition: none !important; animation: none !important; }
+  }
+
+  body.sa-scroll-lock { overflow: hidden; }
+</style>
+
+<script>
+  window.__SA_I18N = {
+    calc: {{ 'size_advisor.calc' | t | json }},
+    calc_loading: {{ 'size_advisor.calc_loading' | t | json }},
+    err_height: {{ 'size_advisor.err_height' | t | json }},
+    err_weight: {{ 'size_advisor.err_weight' | t | json }},
+    err_connection: {{ 'size_advisor.err_connection' | t | json }},
+    result_size: {{ 'size_advisor.result_size' | t | json }},
+    cart_best: {{ 'size_advisor.cart_best' | t | json }},
+    why: {{ 'size_advisor.why' | t | json }},
+    why_hide: {{ 'size_advisor.why_hide' | t | json }},
+    add_to_cart: {{ 'size_advisor.add_to_cart' | t | json }},
+    adding: {{ 'size_advisor.adding' | t | json }},
+    added: {{ 'size_advisor.added' | t | json }},
+    go_to_cart: {{ 'size_advisor.go_to_cart' | t | json }},
+    add_failed: {{ 'size_advisor.add_failed' | t | json }},
+    pick_above: {{ 'size_advisor.pick_above' | t | json }}
+  };
+  window.__SA_LOCALE = {{ localization.language.iso_code | json }};
+
+  // Pełne zestawy PL/EN wpisane na sztywno — potrzebne do przełącznika języka
+  // w widżecie (Liquid `| t` daje tylko aktywny język storefrontu).
+  window.__SA_I18N_ALL = {
+    pl: {
+      trigger: "Sprawdź swój rozmiar",
+      close: "Zamknij",
+      modal_title: "Dobierz idealny rozmiar",
+      modal_desc: "Podaj parametry swojej sylwetki, a nasz asystent dobierze odpowiedni rozmiar.",
+      gender: "Płeć",
+      gender_male: "Mężczyzna",
+      gender_female: "Kobieta",
+      height: "Wzrost (cm)",
+      height_ph: "np. 182",
+      weight: "Waga (kg)",
+      weight_ph: "np. 78",
+      body: "Budowa ciała",
+      body_slim: "Szczupła",
+      body_standard: "Standardowa",
+      body_athletic: "Atletyczna",
+      body_plus: "Masywna",
+      fit: "Preferowane dopasowanie",
+      fit_fitted: "Dopasowany",
+      fit_regular: "Klasyczny",
+      fit_loose: "Luźny",
+      garment_toggle: "Mam ubranie tego typu, które leży idealnie",
+      garment_brand: "Marka",
+      garment_brand_ph: "Marka",
+      garment_size: "Rozmiar",
+      garment_size_ph: "np. M lub 32",
+      garment_hint: "Dobierzemy rozmiar tak, żeby leżał podobnie.",
+      calc: "Oblicz rozmiar",
+      calc_loading: "Analizuję sylwetkę…",
+      err_height: "Podaj poprawny wzrost (140–215 cm).",
+      err_weight: "Podaj poprawną wagę (40–180 kg).",
+      err_connection: "Błąd połączenia z serwerem.",
+      result_size: "Rekomendowany rozmiar: [size]",
+      cart_best: "Twój najlepszy rozmiar: [size]",
+      why: "Dlaczego ten rozmiar?",
+      why_hide: "Ukryj szczegóły",
+      add_to_cart: "Dodaj rozmiar [size] do koszyka",
+      adding: "Dodaję do koszyka…",
+      added: "Dodano rozmiar [size] do koszyka",
+      go_to_cart: "Przejdź do koszyka",
+      add_failed: "Nie udało się dodać do koszyka. Wybierz rozmiar ręcznie powyżej.",
+      pick_above: "Wybierz rozmiar [size] powyżej, aby dodać produkt do koszyka."
+    },
+    en: {
+      trigger: "Check your size",
+      close: "Close",
+      modal_title: "Find your perfect size",
+      modal_desc: "Enter your body measurements and our assistant will pick the right size.",
+      gender: "Gender",
+      gender_male: "Men",
+      gender_female: "Women",
+      height: "Height (cm)",
+      height_ph: "e.g. 182",
+      weight: "Weight (kg)",
+      weight_ph: "e.g. 78",
+      body: "Body type",
+      body_slim: "Slim",
+      body_standard: "Standard",
+      body_athletic: "Athletic",
+      body_plus: "Plus",
+      fit: "Preferred fit",
+      fit_fitted: "Fitted",
+      fit_regular: "Regular",
+      fit_loose: "Loose",
+      garment_toggle: "I have a garment of this type that fits perfectly",
+      garment_brand: "Brand",
+      garment_brand_ph: "Brand",
+      garment_size: "Its size",
+      garment_size_ph: "e.g. M or 32",
+      garment_hint: "We'll pick a size that fits like that one.",
+      calc: "Calculate size",
+      calc_loading: "Analyzing your build…",
+      err_height: "Enter a valid height (140–215 cm).",
+      err_weight: "Enter a valid weight (40–180 kg).",
+      err_connection: "Server connection error.",
+      result_size: "Recommended size: [size]",
+      cart_best: "Your best size: [size]",
+      why: "Why this size?",
+      why_hide: "Hide details",
+      add_to_cart: "Add size [size] to cart",
+      adding: "Adding to cart…",
+      added: "Added size [size] to cart",
+      go_to_cart: "Go to cart",
+      add_failed: "Could not add to cart. Please pick a size manually above.",
+      pick_above: "Pick size [size] above to add the product to cart."
+    }
+  };
+</script>
+
+<script>
+  async function initSizeAdvisor() {
+    if (window.__sizeAdvisorInitialized) return;
+    window.__sizeAdvisorInitialized = true;
+
+    const I18N = window.__SA_I18N || {};
+    const SA_ALL = window.__SA_I18N_ALL || {};
+    const withSize = (tpl, size) => String(tpl || '').replace('[size]', size);
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+
+    const saVariants = {{ product.variants | json }};
+
+    const container = document.getElementById('size-advisor-container');
+    const saRoot = container ? container.closest('.sa-root') : null;
+
+    // Język widżetu: domyślnie dziedziczy po języku sklepu (jeśli PL/EN),
+    // admin może wymusić w Ustawieniach, a kupujący przełączyć ikoną 🌐.
+    const saStoreLang = (function () {
+      const loc = String(window.__SA_LOCALE || '').slice(0, 2).toLowerCase();
+      return loc === 'pl' || loc === 'en' ? loc : 'en';
+    })();
+    let saLang = saStoreLang;
+
+    function applyI18n(lang) {
+      const tbl = SA_ALL[lang];
+      if (!tbl) return;
+      saLang = lang;
+      Object.assign(I18N, tbl);
+      const scope = saRoot || document;
+      scope.querySelectorAll('[data-i18n]').forEach((el) => {
+        const v = tbl[el.getAttribute('data-i18n')];
+        if (v != null) el.textContent = v;
+      });
+      scope.querySelectorAll('[data-i18n-ph]').forEach((el) => {
+        const v = tbl[el.getAttribute('data-i18n-ph')];
+        if (v != null) el.setAttribute('placeholder', v);
+      });
+      scope.querySelectorAll('[data-i18n-aria]').forEach((el) => {
+        const v = tbl[el.getAttribute('data-i18n-aria')];
+        if (v != null) el.setAttribute('aria-label', v);
+      });
+      try { localStorage.setItem('sa-lang', lang); } catch (e) {}
+    }
+
+    let allowAddToCart = false;
+    let askFitPref = false;
+    let askGarment = false;
+    // Ostatnie policzone dane — powtórne „Oblicz" z tymi samymi wartościami, gdy
+    // wynik już jest na ekranie, nie wysyła kolejnego zapytania.
+    let lastCalcKey = null;
+    try {
+      const statusRes = await fetch('/apps/size-advisor/status?v=' + Date.now(), { cache: 'no-store' });
+      const statusData = await statusRes.json();
+
+      if (!statusData.enabled) {
+        return;
+      }
+
+      allowAddToCart = statusData.addToCart === true;
+      askFitPref = statusData.fitPreference === true;
+      if (askFitPref) {
+        const fw = document.getElementById('sa-fit-wrap');
+        if (fw) fw.hidden = false;
+      }
+
+      askGarment = statusData.garmentMatch === true;
+      if (askGarment) {
+        const gw = document.getElementById('sa-garment-wrap');
+        if (gw) gw.hidden = false;
+        const gt = document.getElementById('sa-garment-toggle');
+        const gf = document.getElementById('sa-garment-fields');
+        if (gt && gf) {
+          gt.addEventListener('click', () => {
+            const open = gf.hidden;
+            gf.hidden = !open;
+            gt.setAttribute('aria-expanded', String(open));
+          });
+        }
+      }
+      // Admin może wymusić język widżetu (Ustawienia); "auto" = jak sklep.
+      let needI18n = false;
+      const forced = String(statusData.widgetLang || 'auto').toLowerCase();
+      if ((forced === 'pl' || forced === 'en') && forced !== saLang) {
+        saLang = forced;
+        needI18n = true;
+      }
+
+      // Kupujący może przełączyć język ikoną 🌐 (plan Growth+).
+      if (statusData.langSwitch === true) {
+        try {
+          const stored = localStorage.getItem('sa-lang');
+          if ((stored === 'pl' || stored === 'en') && stored !== saLang) {
+            saLang = stored;
+            needI18n = true;
+          }
+        } catch (e) {}
+        const lt = (saRoot || document).querySelector('#sa-lang-toggle');
+        const setToggleLabel = () => {
+          const codeEl = lt && lt.querySelector('.sa-lang-code');
+          // Pokazujemy AKTUALNY język widżetu (nie docelowy).
+          if (codeEl) codeEl.textContent = saLang === 'pl' ? 'PL' : 'ENG';
+        };
+        if (lt) {
+          lt.hidden = false;
+          setToggleLabel();
+          lt.addEventListener('click', () => {
+            applyI18n(saLang === 'pl' ? 'en' : 'pl');
+            setToggleLabel();
+          });
+        }
+      }
+
+      // Wyrównujemy etykiety tylko gdy język różni się od tego, co wyrenderował
+      // serwer (Liquid `| t`), żeby nie nadpisywać ewentualnych zmian w locale.
+      if (needI18n) applyI18n(saLang);
+
+      if (statusData.poweredBy !== false) {
+        const pb = document.getElementById('sa-powered-by');
+        if (pb) pb.hidden = false;
+      }
+
+      if (statusData.customCss) {
+        const st = document.createElement('style');
+        st.setAttribute('data-sa-custom', '');
+        st.textContent = String(statusData.customCss);
+        document.head.appendChild(st);
+      }
+
+      container.hidden = false;
+    } catch (err) {
+      console.error('Size Advisor: status check failed.', err);
+      return;
+    }
+
+    const btn = document.getElementById('size-advisor-btn');
+    const modal = document.getElementById('size-advisor-modal');
+    const modalContent = modal ? modal.querySelector('.size-advisor-modal-content') : null;
+    const close = document.getElementById('size-advisor-close');
+    const calcBtn = document.getElementById('get-recommendation-btn');
+    const resultDiv = document.getElementById('size-advisor-result');
+    const cartAction = document.getElementById('sa-cart-action');
+    let lastFocus = null;
+
+    function openModal() {
+      if (!modal) return;
+      lastFocus = document.activeElement;
+      modal.classList.add('is-open');
+      document.body.classList.add('sa-scroll-lock');
+      setTimeout(() => { if (modalContent) modalContent.focus(); }, 40);
+    }
+    function closeModal() {
+      if (!modal) return;
+      modal.classList.remove('is-open');
+      document.body.classList.remove('sa-scroll-lock');
+      if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
+    }
+
+    function setResult(state, html) {
+      resultDiv.hidden = false;
+      resultDiv.className = 'sa-result' + (state ? ' sa-result--' + state : '');
+      resultDiv.innerHTML = html;
+    }
+
+    function findVariantForSize(size) {
+      if (!Array.isArray(saVariants) || !size) return null;
+      const target = String(size).trim().toLowerCase();
+      const matches = saVariants.filter((v) =>
+        [v.option1, v.option2, v.option3].some(
+          (opt) => opt && String(opt).trim().toLowerCase() === target
+        )
+      );
+      if (!matches.length) return null;
+      return matches.find((v) => v.available) || matches[0];
+    }
+
+    async function pingAccepted(logId) {
+      if (!logId) return;
+      try {
+        await fetch('/apps/size-advisor/accept', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ logId }),
+        });
+      } catch (err) {
+        console.error('Size Advisor: failed to record add-to-cart event.', err);
+      }
+    }
+
+    function renderCartAction(size, logId) {
+      cartAction.innerHTML = '';
+      const variant = findVariantForSize(size);
+
+      if (!variant) {
+        cartAction.hidden = false;
+        const note = document.createElement('p');
+        note.className = 'sa-cart-note';
+        note.innerText = withSize(I18N.pick_above, size);
+        cartAction.appendChild(note);
+        return;
+      }
+
+      cartAction.hidden = false;
+
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'sa-add-to-cart';
+      addBtn.innerText = '🛒 ' + withSize(I18N.add_to_cart, size);
+
+      addBtn.addEventListener('click', async () => {
+        addBtn.disabled = true;
+        addBtn.innerText = I18N.adding;
+        try {
+          const addBody = { id: variant.id, quantity: 1 };
+          if (logId) {
+            // Hidden line-item property (leading "_") — not shown to the customer
+            // in cart/checkout but present on the order; the orders/create webhook
+            // uses it to recognise a purchase driven by a recommendation.
+            addBody.properties = { _size_advisor: logId };
+          }
+
+          const res = await fetch('/cart/add.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(addBody),
+          });
+          if (!res.ok) throw new Error('cart/add failed: ' + res.status);
+
+          await pingAccepted(logId);
+
+          cartAction.innerHTML =
+            '<p class="sa-cart-done">✓ ' + withSize(I18N.added, size) +
+            '<br><a href="/cart">' + I18N.go_to_cart + '</a></p>';
+        } catch (err) {
+          console.error('Size Advisor: add-to-cart failed.', err);
+          addBtn.disabled = false;
+          addBtn.innerText = '🛒 ' + withSize(I18N.add_to_cart, size);
+          const note = document.createElement('p');
+          note.className = 'sa-cart-note';
+          note.innerText = I18N.add_failed;
+          cartAction.appendChild(note);
+        }
+      });
+
+      cartAction.appendChild(addBtn);
+    }
+
+    if (btn && modal) {
+      btn.addEventListener('click', openModal);
+      close.addEventListener('click', closeModal);
+      modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.classList.contains('is-open')) closeModal();
+      });
+    }
+
+    function setupPillGroup(groupId) {
+      const group = document.getElementById(groupId);
+      if (!group) return;
+      const buttons = group.querySelectorAll('.sa-pill-btn');
+      buttons.forEach(b => {
+        b.addEventListener('click', () => {
+          buttons.forEach(btnEl => {
+            btnEl.classList.remove('active');
+            btnEl.setAttribute('aria-pressed', 'false');
+          });
+          b.classList.add('active');
+          b.setAttribute('aria-pressed', 'true');
+        });
+      });
+    }
+
+    setupPillGroup('sa-gender-group');
+    setupPillGroup('sa-body-group');
+    setupPillGroup('sa-fit-group');
+
+    if (calcBtn) {
+      calcBtn.addEventListener('click', async () => {
+        if (calcBtn.dataset.loading === '1') return;
+
+        const height = Number(document.getElementById('user-height').value);
+        const weight = Number(document.getElementById('user-weight').value);
+        const gender = document.querySelector('#sa-gender-group .sa-pill-btn.active')?.dataset.value || 'male';
+        const bodyType = document.querySelector('#sa-body-group .sa-pill-btn.active')?.dataset.value || 'standard';
+
+        if (!height || height < 140 || height > 215) {
+          setResult('err', I18N.err_height);
+          return;
+        }
+        if (!weight || weight < 40 || weight > 180) {
+          setResult('err', I18N.err_weight);
+          return;
+        }
+
+        const _fp = askFitPref
+          ? (document.querySelector('#sa-fit-group .sa-pill-btn.active')?.dataset.value || 'regular')
+          : '';
+        const _rb = askGarment ? (document.getElementById('sa-ref-brand')?.value || '').trim() : '';
+        const _rs = askGarment ? (document.getElementById('sa-ref-size')?.value || '').trim() : '';
+        const calcKey = [height, weight, gender, bodyType, _fp, _rb, _rs, saLang].join('|');
+        const resultShown = resultDiv && !resultDiv.hidden && resultDiv.classList.contains('sa-result--ok');
+        if (calcKey === lastCalcKey && resultShown) {
+          // te same dane + wynik już widoczny → nic nie ruszamy (przycisk koszyka zostaje)
+          return;
+        }
+
+        cartAction.hidden = true;
+        cartAction.innerHTML = '';
+
+        calcBtn.dataset.loading = '1';
+        calcBtn.disabled = true;
+        calcBtn.classList.add('is-loading');
+        setResult('loading', '<span>' + I18N.calc_loading + '</span>');
+
+        const fitPreference = _fp;
+        const refBrand = _rb;
+        const refSize = _rs;
+
+        try {
+          const payload = JSON.stringify({
+            height,
+            weight,
+            gender,
+            bodyType,
+            fitPreference,
+            refBrand,
+            refSize,
+            locale: saLang || window.__SA_LOCALE || 'en',
+            productId: {{ product.id | json }},
+            productTitle: {{ product.title | default: "" | json }},
+            productDescription: {{ product.description | strip_html | json }}
+          });
+
+          const response = await fetch('/apps/size-advisor/recommend', {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: payload
+          });
+
+          const data = await response.json();
+
+          if (data.error) {
+            setResult('err', esc(data.error));
+          } else {
+            const headline = esc(data.explanation || '');
+            const detail = String(data.explanationDetail || '');
+            const hasDetail = detail && detail !== (data.explanation || '');
+            let html =
+              '<span class="sa-result-size">' + esc(withSize(I18N.result_size, data.size)) + '</span>' +
+              '<span class="sa-result-why">' + headline + '</span>';
+            if (hasDetail) {
+              html +=
+                '<button type="button" class="sa-why-toggle" aria-expanded="false">' +
+                esc(I18N.why || 'Why this size?') + '</button>' +
+                '<span class="sa-why-detail" hidden>' + esc(detail) + '</span>';
+            }
+            setResult('ok', html);
+            if (hasDetail) {
+              const tg = resultDiv.querySelector('.sa-why-toggle');
+              const dt = resultDiv.querySelector('.sa-why-detail');
+              if (tg && dt) {
+                tg.addEventListener('click', () => {
+                  const open = dt.hidden;
+                  dt.hidden = !open;
+                  tg.setAttribute('aria-expanded', open ? 'true' : 'false');
+                  tg.textContent = open
+                    ? (I18N.why_hide || 'Hide')
+                    : (I18N.why || 'Why this size?');
+                });
+              }
+            }
+            if (allowAddToCart) renderCartAction(data.size, data.logId);
+            lastCalcKey = calcKey; // zapamiętaj — powtórka z tymi samymi danymi nie wyśle zapytania
+          }
+        } catch (err) {
+          setResult('err', I18N.err_connection);
+        } finally {
+          calcBtn.dataset.loading = '0';
+          calcBtn.disabled = false;
+          calcBtn.classList.remove('is-loading');
+        }
+      });
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSizeAdvisor);
+  } else {
+    initSizeAdvisor();
+  }
+</script>
+
+{% schema %}
+{
+  "name": "Size Advisor Button",
+  "target": "section",
+  "enabled_on": {
+    "templates": ["product"]
+  },
+  "settings": [
+    { "type": "header", "content": "Button text" },
+    {
+      "type": "text",
+      "id": "trigger_label",
+      "label": "Label",
+      "info": "Leave blank to use the translated default."
+    },
+    { "type": "checkbox", "id": "show_icon", "label": "Show icon", "default": true },
+    { "type": "text", "id": "icon_char", "label": "Icon", "default": "📏", "info": "Any emoji or character. Only shown when \"Show icon\" is on." },
+
+    { "type": "header", "content": "Size & spacing" },
+    {
+      "type": "select",
+      "id": "button_width",
+      "label": "Width",
+      "options": [
+        { "value": "full", "label": "Full width" },
+        { "value": "inline", "label": "Fit content" }
+      ],
+      "default": "full"
+    },
+    {
+      "type": "range",
+      "id": "custom_width",
+      "label": "Fixed width",
+      "min": 0, "max": 600, "step": 10, "unit": "px", "default": 0,
+      "info": "0 = use the Width setting above. Any other value forces an exact width."
+    },
+    {
+      "type": "select",
+      "id": "button_align",
+      "label": "Alignment (fit-content or fixed width)",
+      "options": [
+        { "value": "flex-start", "label": "Left" },
+        { "value": "center", "label": "Center" },
+        { "value": "flex-end", "label": "Right" }
+      ],
+      "default": "flex-start"
+    },
+    {
+      "type": "font_picker",
+      "id": "button_font",
+      "label": "Font",
+      "default": "helvetica_n4",
+      "info": "Any font from your theme's font library, including custom uploads."
+    },
+    { "type": "range", "id": "font_size", "label": "Font size", "min": 11, "max": 22, "step": 1, "unit": "px", "default": 15 },
+    {
+      "type": "select",
+      "id": "font_weight",
+      "label": "Font weight",
+      "options": [
+        { "value": "400", "label": "Regular" },
+        { "value": "500", "label": "Medium" },
+        { "value": "600", "label": "Semibold" },
+        { "value": "700", "label": "Bold" }
+      ],
+      "default": "600"
+    },
+    { "type": "range", "id": "padding_y", "label": "Vertical padding", "min": 6, "max": 28, "step": 1, "unit": "px", "default": 13 },
+    { "type": "range", "id": "padding_x", "label": "Horizontal padding", "min": 8, "max": 48, "step": 1, "unit": "px", "default": 22 },
+    { "type": "range", "id": "corner_radius", "label": "Corner radius (button & popup)", "min": 0, "max": 40, "step": 1, "unit": "px", "default": 8 },
+    { "type": "range", "id": "spacing", "label": "Space above & below", "min": 0, "max": 40, "step": 1, "unit": "px", "default": 15 },
+
+    { "type": "header", "content": "Colors" },
+    { "type": "color", "id": "bg_color", "label": "Background", "default": "#111111" },
+    { "type": "color", "id": "text_color", "label": "Text", "default": "#ffffff" },
+    { "type": "color", "id": "bg_color_hover", "label": "Background on hover", "info": "Optional." },
+
+    { "type": "header", "content": "Hover effect" },
+    {
+      "type": "select",
+      "id": "hover_effect",
+      "label": "On hover",
+      "options": [
+        { "value": "fade", "label": "Fade" },
+        { "value": "lift", "label": "Lift" },
+        { "value": "shadow", "label": "Shadow" },
+        { "value": "none", "label": "None" }
+      ],
+      "default": "fade"
+    },
+
+    { "type": "header", "content": "Popup" },
+    {
+      "type": "text",
+      "id": "modal_title",
+      "label": "Popup title",
+      "info": "Leave blank to use the translated default."
+    },
+    {
+      "type": "text",
+      "id": "modal_subtitle",
+      "label": "Popup subtitle",
+      "info": "Leave blank to use the translated default."
+    },
+    {
+      "type": "color",
+      "id": "accent",
+      "label": "Accent color",
+      "default": "#111111",
+      "info": "Used for the selected options, the result box and the confirm button inside the popup."
+    }
+  ]
+}
+{% endschema %}

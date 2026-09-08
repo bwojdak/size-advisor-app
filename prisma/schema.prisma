@@ -1,0 +1,116 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+model ShopSettings {
+  id           String        @id @default(uuid())
+  shop         String        @unique
+  plan         String        @default("free")
+  isEnabled    Boolean       @default(true)
+  brandStyle   String        @default("streetwear")
+  aiStyleNotes String?
+  accentColor  String        @default("#000000")
+  language     String        @default("pl")
+  monthlyLimit Int           @default(150)
+  requestsUsed Int           @default(0)
+  usageMonth   String?       // "YYYY-MM" — leniwy reset licznika co miesiąc
+  subscriptionId String?     // gid aktywnej subskrypcji Shopify Billing
+  askFitPreference Boolean   @default(false) // widżet pyta o preferencję dopasowania
+  askGarmentMatch  Boolean   @default(false) // widżet pyta o dobrze leżące ubranie referencyjne
+  widgetLanguage   String    @default("auto") // język widżetu: "auto" (jak sklep) | "pl" | "en"
+  widgetCustomCss  String?   // własny CSS wstrzykiwany do widżetu (Growth+)
+  productRules     ProductRule[]
+  productAnalyses  ProductAnalysis[]
+  advisorLogs      AdvisorLog[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model ProductRule {
+  id             String       @id @default(uuid())
+  shopId         String
+  shop           ShopSettings @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  productId      String       // Shopify Product ID (numeric, np. "8123456789")
+  productTitle   String?      // Cache tytułu do wyświetlania w panelu
+  parsedSizeData String?      // Tabela wymiarów wpisana / wklejona tekstem
+  customNotes    String?      // Notatki dla AI, np. "zaniżona rozmiarówka"
+  sizeChartImage String?      // Zdjęcie rozmiarówki jako data URL (base64)
+
+  // Jednorazowa analiza produktu przez AI (config-time). Przy zapytaniu klienta
+  // używamy jej bez wołania modelu; przeliczamy tylko gdy zmieni się tabela /
+  // opis / styl marki albo wzrośnie EXTRACTION_VERSION.
+  extractionJson    String?   // surowy JSON modelu (ChartExtraction źródłowy)
+  extractionAt      DateTime?
+  extractionModel   String?
+  extractionVersion Int?
+  extractionError   String?   // ostatni błąd analizy (nie blokuje zapisu reguły)
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([shopId, productId])
+}
+
+// Cache analizy produktów, których admin NIE skonfigurował ręcznie. Powstaje
+// leniwie przy pierwszym zapytaniu klienta o taki produkt i jest potem używana
+// bez wołania modelu. Świadomie ODDZIELONE od ProductRule (to jest „admin to
+// skonfigurował" — wlicza się do limitu planu i listy w panelu).
+model ProductAnalysis {
+  id                String       @id @default(uuid())
+  shopId            String
+  shop              ShopSettings @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  productId         String       // Shopify Product ID (numeryczne)
+  extractionJson    String       // surowy JSON modelu (ChartExtraction źródłowy)
+  extractionModel   String?
+  extractionVersion Int
+  analyzedAt        DateTime     @default(now())
+
+  @@unique([shopId, productId])
+}
+
+model AdvisorLog {
+  id              String       @id @default(uuid())
+  shopId          String
+  shop            ShopSettings @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  productTitle    String
+  customerHeight  Int
+  customerWeight  Int
+  customerGender  String
+  bodyType        String
+  recommendedSize String
+  addedToCart     Boolean      @default(false)
+  purchased       Boolean      @default(false)
+  orderId         String?
+  orderTotal      Float?       // wartość zamówienia z webhooka orders/create
+  orderCurrency   String?
+  purchasedAt     DateTime?
+  createdAt       DateTime     @default(now())
+}
