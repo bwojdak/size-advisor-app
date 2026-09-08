@@ -13,8 +13,10 @@ import { PLAN, PLAN_PRICE, TRIAL_DAYS } from "./lib/plans";
 export { PLAN, PAID_PLANS, PLAN_LIMITS, PLAN_PRICE } from "./lib/plans";
 export type { PlanName } from "./lib/plans";
 
-/** Obciążenia testowe (bez realnej płatności) poza produkcją. */
-export const BILLING_IS_TEST = process.env.NODE_ENV !== "production";
+/** Obciążenia testowe (bez realnej karty) — DOMYŚLNIE włączone.
+ *  Prawdziwe płatności dopiero po jawnym `BILLING_LIVE=true` (launch na App Store).
+ *  Dzięki temu nie da się przypadkiem obciążyć merchanta podczas testów. */
+export const BILLING_IS_TEST = process.env.BILLING_LIVE !== "true";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
