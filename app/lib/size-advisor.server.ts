@@ -232,6 +232,7 @@ function estimateLetterSize(
   gender: string,
   build: string,
   fit: FitPreference,
+  category: GarmentCategory,
 ): string {
   const chest = estimateChest(h, w, gender, build);
   // Górna granica pasma → etykieta (pełny obwód w cm).
@@ -239,7 +240,7 @@ function estimateLetterSize(
     gender === "female"
       ? [[82, "XS"], [88, "S"], [94, "M"], [100, "L"], [108, "XL"], [116, "XXL"]]
       : [[86, "XS"], [94, "S"], [102, "M"], [110, "L"], [118, "XL"], [128, "XXL"]];
-  let label = "3XL";
+  let label = "XXL";
   for (const [hi, s] of bands) {
     if (chest < hi) {
       label = s;
@@ -248,11 +249,20 @@ function estimateLetterSize(
   }
   let idx = CANON_SIZES.indexOf(label);
   if (idx < 0) idx = CANON_SIZES.indexOf("M");
+
+  // Podłoga wzrostu dla GÓRY: tors długiej osoby wymaga minimum długości bez
+  // względu na obwód — inaczej 198 cm szczupły dostawał „S" (crop).
+  if (category !== "bottom") {
+    const hFloor =
+      h >= 197 ? "XL" : h >= 189 ? "L" : h >= 181 ? "M" : h >= 172 ? "S" : null;
+    if (hFloor) idx = Math.max(idx, CANON_SIZES.indexOf(hFloor));
+  }
+
   // Bez tabeli tylko „loose" przesuwa w górę — automatyczne schodzenie przy
   // „fitted" grozi za małym rozmiarem, którego klient nie założy (a osoba
   // preferująca fason dopasowany zwykle i tak jest w dolnej części pasma).
   if (fit === "loose") idx += 1;
-  idx = clamp(idx, CANON_SIZES.indexOf("XS"), CANON_SIZES.indexOf("4XL"));
+  idx = clamp(idx, CANON_SIZES.indexOf("XS"), CANON_SIZES.indexOf("XXL"));
   return CANON_SIZES[idx];
 }
 
@@ -829,6 +839,42 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
     }
   }
 
+  // --- Sito wiarygodności ---------------------------------------------------
+  // Wynik oddalony o >2 stopnie rozmiaru od zgrubnego oczekiwania z SAMEGO ciała
+  // to prawie na pewno błąd danych z tabeli (klatka wpisana jako pas, połówki
+  // potraktowane jako pełne obwody, zła kategoria). Przycinamy do 2 stopni od
+  // oczekiwania — ale tylko do rozmiaru, który realnie jest w tabeli. Dotyczy
+  // rozmiarów literowych; przy liczbowych (jeansy) po prostu nie wchodzi.
+  {
+    const expIdx = CANON_SIZES.indexOf(
+      estimateLetterSize(height, weight, gender, bodyType, null, category),
+    );
+    const chosenIdx = CANON_SIZES.indexOf(
+      chosen.size.toUpperCase().replace(/\s+/g, ""),
+    );
+    if (expIdx >= 0 && chosenIdx >= 0 && Math.abs(chosenIdx - expIdx) > 2) {
+      const targetIdx = expIdx + (chosenIdx > expIdx ? 2 : -2);
+      let best = chosen;
+      let bestGap = Infinity;
+      for (const r of rows) {
+        const ci = CANON_SIZES.indexOf(r.size.toUpperCase().replace(/\s+/g, ""));
+        if (ci < 0) continue;
+        const gap = Math.abs(ci - targetIdx);
+        if (gap < bestGap) {
+          bestGap = gap;
+          best = r;
+        }
+      }
+      if (best !== chosen) {
+        console.warn(
+          "[resolveSize] sito wiarygodności — wynik odjeżdża od sylwetki, przycięto",
+          { from: chosen.size, to: best.size, expectedIdx: expIdx },
+        );
+        chosen = best;
+      }
+    }
+  }
+
   const finalPrimary = useWaist ? chosen.waist : chosen.chest;
   return {
     size: chosen.size.toUpperCase().replace(/\s+/g, ""),
@@ -1203,10 +1249,24 @@ export function decideSize(
 
   // Brak tabeli → rozmiar liczymy deterministycznie z obwodu ciała (model przy
   // braku tabeli i tak zawsze zgaduje „M"). Nagłówek krótki, szczegóły uczciwe.
-  const size =
+  let size =
     height > 0
-      ? estimateLetterSize(height, weight, gender, bodyType, fit)
+      ? estimateLetterSize(height, weight, gender, bodyType, fit, extraction.category)
       : (extraction.fallbackSize || "M").toUpperCase().replace(/\s+/g, "");
+
+  // Jeśli model zwrócił choćby same etykiety rozmiarów (bez wymiarów), nie
+  // wychodzimy poza ten zakres — inaczej padało „3XL" dla produktu, który
+  // kończy się na XL.
+  const labelIdxs = extraction.rows
+    .map((r) => CANON_SIZES.indexOf(r.size.toUpperCase().replace(/\s+/g, "")))
+    .filter((i) => i >= 0);
+  if (labelIdxs.length >= 2) {
+    const lo = Math.min(...labelIdxs);
+    const hi = Math.max(...labelIdxs);
+    let si = CANON_SIZES.indexOf(size);
+    if (si < 0) si = CANON_SIZES.indexOf("M");
+    size = CANON_SIZES[clamp(si, lo, hi)];
+  }
   const isPl = (d.locale || "pl").toLowerCase().slice(0, 2) === "pl";
   const headline = isPl
     ? `Rozmiar ${size} — oszacowany na podstawie Twoich wymiarów.`
