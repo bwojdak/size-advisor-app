@@ -374,8 +374,9 @@ const messages: Record<Locale, Record<string, string>> = {
     "settings.tester.noChart": "brak tabeli wymiarów dla produktu",
     "settings.tester.run": "Uruchom test",
     "settings.tester.resultSize": "Rekomendowany rozmiar: {size}",
-    "settings.tester.usedBrand": "Uwzględniono styl marki.",
-    "settings.tester.noBrand": "Styl marki jest pusty — nie wpłynął na wynik.",
+    "settings.tester.usedBrand": "Uwzględniono notatki o marce z Ustawień.",
+    "settings.tester.noBrand":
+      "Notatki o marce (Ustawienia) są puste — nie wpłynęły na wynik.",
     "settings.tester.ref": "Ubranie referencyjne (opcjonalnie)",
     "settings.tester.refBrand": "Marka",
     "settings.tester.refSize": "Rozmiar (np. M lub 32)",
@@ -732,8 +733,9 @@ const messages: Record<Locale, Record<string, string>> = {
     "settings.tester.noChart": "no size chart for the product",
     "settings.tester.run": "Run test",
     "settings.tester.resultSize": "Recommended size: {size}",
-    "settings.tester.usedBrand": "Brand fit was taken into account.",
-    "settings.tester.noBrand": "Brand fit is empty — it did not affect the result.",
+    "settings.tester.usedBrand": "Brand style notes from Settings were applied.",
+    "settings.tester.noBrand":
+      "Brand style notes (Settings) are empty — they didn't affect the result.",
     "settings.tester.ref": "Reference garment (optional)",
     "settings.tester.refBrand": "Brand",
     "settings.tester.refSize": "Size (e.g. M or 32)",
