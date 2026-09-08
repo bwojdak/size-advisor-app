@@ -715,6 +715,29 @@ export default function ProductsConfig() {
                           {editingExtraction.summary.sizes.join(" · ")}
                         </Text>
                       ) : null}
+                      {editingExtraction.summary.dataQuality.length ? (
+                        <Box
+                          padding="200"
+                          background="bg-surface-caution"
+                          borderRadius="100"
+                        >
+                          <BlockStack gap="050">
+                            <Text as="span" variant="bodyXs" fontWeight="medium">
+                              {t("products.extraction.dq.title")}
+                            </Text>
+                            {editingExtraction.summary.dataQuality.map((code) => (
+                              <Text
+                                key={code}
+                                as="span"
+                                variant="bodyXs"
+                                tone="caution"
+                              >
+                                {t(`products.extraction.dq.${code}`)}
+                              </Text>
+                            ))}
+                          </BlockStack>
+                        </Box>
+                      ) : null}
                       <Text as="span" variant="bodyXs" tone="subdued">
                         {t("products.extraction.help")}
                       </Text>

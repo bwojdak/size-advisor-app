@@ -648,16 +648,21 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
     mode = gradeOnLength ? "length" : useWaist ? "waist" : "chest";
     const pool = rows.filter((r) => (valueOf(r) ?? 0) > 0);
     const baseIdx = pool.indexOf(modelRow);
-    const HEIGHT_PER_SIZE = 6;
+    // Topy/bluzy gradują ~1 rozmiar na 10–12 cm wzrostu, nie na 6 — przy 6 cm
+    // klient 5 cm wyższy od modela dostawał od razu rozmiar wyżej.
+    const HEIGHT_PER_SIZE = 12;
     const raw = (height - extraction.modelHeight!) / HEIGHT_PER_SIZE;
     const step = Math.round(raw);
     const idx = clamp(baseIdx + step, 0, pool.length - 1);
     target = valueOf(pool[idx]);
     window = [target - 1, target + 1];
     candRows = [pool[idx]];
+    // Zawsze dołóż sąsiada po stronie, w którą „ciągnie" wzrost — żeby
+    // „Dopasowany"/„Luźny" miało czym operować (wcześniej przy małym frac
+    // preferencja fasonu była w tym trybie po cichu ignorowana).
     const frac = raw - step;
-    if (frac >= 0.2 && idx + 1 < pool.length) candRows.push(pool[idx + 1]);
-    else if (frac <= -0.2 && idx - 1 >= 0) candRows.unshift(pool[idx - 1]);
+    if (frac > 0.08 && idx + 1 < pool.length) candRows.push(pool[idx + 1]);
+    else if (frac < -0.08 && idx - 1 >= 0) candRows.unshift(pool[idx - 1]);
   } else if (proportional && lengthDimFn) {
     // --- Tryb: po długości vs wzrost (bez wzorca) ---
     mode = "length";
@@ -1292,12 +1297,38 @@ export function describeExtraction(e: ChartExtraction): {
   korekta: -1 | 0 | 1;
   modelAnchor: { height: number; size: string } | null;
   hasMeasurements: boolean;
+  /** Braki w danych wejściowych, przez które silnik dobiera „na oko" —
+   *  pokazywane merchantowi w panelu, żeby uzupełnił tabelę. */
+  dataQuality: Array<
+    "too_few_rows" | "no_measurements" | "bottom_no_waist" | "top_no_chest"
+  >;
 } {
+  const rows = e.rows;
+  const hasChest = rows.some((r) => r.chest != null);
+  const hasWaist = rows.some((r) => r.waist != null);
+  const hasHip = rows.some((r) => r.hip != null);
+  const hasLen = rows.some((r) => r.length != null || r.inseam != null);
+  const primaryOk =
+    e.category === "bottom" ? hasWaist || hasHip : hasChest;
+
+  const dataQuality: Array<
+    "too_few_rows" | "no_measurements" | "bottom_no_waist" | "top_no_chest"
+  > = [];
+  if (rows.length < 2) {
+    dataQuality.push("too_few_rows");
+  } else if (!hasChest && !hasWaist && !hasHip && !hasLen) {
+    dataQuality.push("no_measurements");
+  } else if (!primaryOk) {
+    dataQuality.push(
+      e.category === "bottom" ? "bottom_no_waist" : "top_no_chest",
+    );
+  }
+
   return {
     category: e.category,
     cut: e.cut,
-    rowCount: e.rows.length,
-    sizes: e.rows.map((r) => r.size),
+    rowCount: rows.length,
+    sizes: rows.map((r) => r.size),
     stretch: e.stretch,
     elasticWaist: e.elasticWaist,
     outerwear: e.outerwear,
@@ -1306,9 +1337,8 @@ export function describeExtraction(e: ChartExtraction): {
       e.modelHeight && e.modelSize
         ? { height: e.modelHeight, size: e.modelSize }
         : null,
-    hasMeasurements: e.rows.some(
-      (r) => r.chest != null || r.waist != null || r.hip != null || r.length != null,
-    ),
+    hasMeasurements: hasChest || hasWaist || hasHip || hasLen,
+    dataQuality,
   };
 }
 

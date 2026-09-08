@@ -267,6 +267,15 @@ const messages: Record<Locale, Record<string, string>> = {
     "products.extraction.outerwear": "Odzież wierzchnia",
     "products.extraction.korekta": "Korekta rozmiaru {n}",
     "products.extraction.modelAnchor": "Wzorzec: model {h} cm nosi {s}",
+    "products.extraction.dq.title": "Uzupełnij dane, żeby dobór był dokładniejszy:",
+    "products.extraction.dq.too_few_rows":
+      "Brak tabeli rozmiarów — wklej wymiary w cm dla każdego rozmiaru (inaczej rozmiar jest tylko szacowany ze wzrostu i wagi).",
+    "products.extraction.dq.no_measurements":
+      "Wykryto tylko etykiety rozmiarów bez centymetrów — wklej obwody / długości w cm, żeby dobór nie był zgadywany.",
+    "products.extraction.dq.bottom_no_waist":
+      "Brak obwodu pasa dla dołu — dodaj „pas” (a najlepiej też „biodra”) w cm dla każdego rozmiaru. Bez tego rozmiar jest dobierany po wzroście/długości i może nie trafiać dla tęższych sylwetek.",
+    "products.extraction.dq.top_no_chest":
+      "Brak obwodu klatki — dodaj „klatka” (lub „szerokość”) w cm dla każdego rozmiaru. Bez tego dobór idzie po długości/wzroście i waga klienta prawie nie wpływa na wynik.",
 
     "products.import.button": "Importuj CSV",
     "products.import.template": "Pobierz szablon CSV",
@@ -626,6 +635,15 @@ const messages: Record<Locale, Record<string, string>> = {
     "products.extraction.outerwear": "Outerwear",
     "products.extraction.korekta": "Size adjustment {n}",
     "products.extraction.modelAnchor": "Reference: model {h} cm wears {s}",
+    "products.extraction.dq.title": "Add data for a more accurate fit:",
+    "products.extraction.dq.too_few_rows":
+      "No size chart — paste per-size measurements in cm (otherwise the size is only estimated from height and weight).",
+    "products.extraction.dq.no_measurements":
+      "Only size labels detected, no centimetres — paste circumferences / lengths in cm so the pick isn't guessed.",
+    "products.extraction.dq.bottom_no_waist":
+      "No waist measurement for a bottom — add \"waist\" (ideally \"hip\" too) in cm per size. Without it the size is picked by height/length and can miss for larger builds.",
+    "products.extraction.dq.top_no_chest":
+      "No chest measurement — add \"chest\" (or \"width\") in cm per size. Without it the pick goes by length/height and the shopper's weight barely affects the result.",
 
     "products.import.button": "Import CSV",
     "products.import.template": "Download CSV template",
