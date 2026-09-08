@@ -197,12 +197,16 @@ function estimateChest(
   build: string,
 ): number {
   const female = gender === "female";
-  const base = female ? 90 : 96;
-  // Odchyłka od „wagi należnej" – dla kobiet niższy punkt odniesienia.
-  const weightAdj = (w - (h - (female ? 108 : 100))) * 0.62;
+  const base = female ? 90 : 95.5;
+  // „Waga należna" wg BMI ~23.5 (M) / 21.5 (K). Wcześniej wzór Broki (wzrost−100)
+  // zawyżał ją u wysokich osób, przez co nadwyżka masy była niedoszacowana i
+  // rozmiar spadał o jeden dla postawnych sylwetek. Stromszy współczynnik masy
+  // (0.72) rozsuwa szczupłych i tęższych.
+  const idealWeight = (female ? 21.5 : 23.5) * (h / 100) ** 2;
+  const weightAdj = (w - idealWeight) * 0.72;
   const buildAdj =
     build === "slim" ? -3 : build === "athletic" ? 3 : build === "plus" ? 11 : 0;
-  return clamp(base + weightAdj + buildAdj + (h - 175) * 0.25, 74, 152);
+  return clamp(base + weightAdj + buildAdj + (h - 175) * 0.28, 74, 152);
 }
 
 function estimateWaist(
@@ -213,8 +217,9 @@ function estimateWaist(
 ): number {
   const chest = estimateChest(h, w, gender, build);
   const drop = gender === "female" ? 18 : 13;
+  // Sylwetka atletyczna = wyraźny V-taper: klatka w górę, ale pas mocno w dół.
   const buildAdj =
-    build === "plus" ? 8 : build === "athletic" ? -1 : build === "slim" ? -2 : 0;
+    build === "plus" ? 8 : build === "athletic" ? -4 : build === "slim" ? -2 : 0;
   return clamp(chest - drop + buildAdj, 56, 142);
 }
 
@@ -688,6 +693,12 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
 
   if (candRows.length === 0) return null;
 
+  // Kandydaci ZAWSZE rosnąco wg mierzonego wymiaru — „fitted"/„loose" przesuwają
+  // o jeden krok pozycyjnie, a `nearest()` potrafi zwrócić ich w kolejności
+  // odległości. (Sortujemy po `valueOf`, nie po etykiecie — działa też dla
+  // rozmiarów liczbowych typu „32".)
+  candRows = [...candRows].sort((a, b) => valueOf(a) - valueOf(b));
+
   let chosen = candRows[0];
   let tieBrokenBy: ResolveResult["tieBrokenBy"] =
     candRows.length === 1 ? "single" : null;
@@ -780,7 +791,10 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
       } else {
         const c = r.chest;
         if (!c) break;
-        if (c >= bodyPrimary + minEase) {
+        // Dzianina / elastan naciąga ~6 cm w klatce — rozmiar z lekko ujemnym
+        // luzem przy takim materiale nadal siądzie.
+        const give = extraction.stretch ? 6 : 0;
+        if (c + give >= bodyPrimary + minEase) {
           chosen = r;
           break;
         }
