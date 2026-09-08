@@ -290,7 +290,7 @@ export function buildSizeAdvisorPrompt(input: PromptInput): string {
   const refSize = ref?.size?.trim();
   const refLine =
     refBrand && refSize
-      ? `\nUBRANIE REFERENCYJNE: klient mówi, że „${refBrand}" w rozmiarze „${refSize}" (podobny typ jak ten produkt) leży na nim IDEALNIE. Jeśli PEWNIE znasz realne wymiary tej konkretnej marki i rozmiaru, porównaj UBRANIE DO UBRANIA (nie licz obwodu ciała) i wpisz w "refRozmiarWTabeli" ten rozmiar z "tabela", który leżałby najbardziej podobnie.\nWpisz null, jeśli: nie znasz tej marki, to marka mało znana / regionalna / lokalna, nazwa lub rozmiar wyglądają na przypadkowe / błędne, albo nie jesteś pewny wymiarów. NIE zgaduj i NIE wpisuj rozmiaru „na oko" z samego wzrostu/wagi — od tego jest program. Lepiej null niż zła podpowiedź.\n`
+      ? `\nUBRANIE REFERENCYJNE: klient mówi, że „${refBrand}" w rozmiarze „${refSize}" (podobny typ jak ten produkt) leży na nim IDEALNIE. Jeśli „${refBrand}" to marka rozpoznawalna, o w miarę spójnej rozmiarówce (np. Zara, H&M, Nike, Uniqlo, Reserved, COS, Mango, Levi's, Adidas, Massimo Dutti i podobne sieciówki), porównaj UBRANIE DO UBRANIA (nie licz obwodu ciała) i wpisz w "refRozmiarWTabeli" ten rozmiar z "tabela", który leżałby najbardziej podobnie.\nWpisz null TYLKO jeśli: marka jest naprawdę nieznana / czysto lokalna / handmade, albo nazwa lub rozmiar to wygląda na przypadkowy ciąg znaków ("${refBrand}" / "${refSize}"). Nie zgaduj rozmiaru „na oko" z samego wzrostu/wagi — od tego jest program.\n`
       : "";
 
   const langCode = (input.responseLanguage || "pl").toLowerCase().slice(0, 2);
@@ -343,7 +343,7 @@ ZASADY:
 - "pasNaGumce": true jeśli pas jest elastyczny / na gumce / ze sznurkiem / ściągaczem (dresy, joggery). false dla sztywnego pasa z guzikiem (jeansy, chinosy, spodnie garniturowe).
 - "odziezWierzchnia": true dla kurtki, płaszcza, parki, marynarki noszonej na wierzch. false dla t-shirtu, bluzy, koszuli.
 - "modelWzrost" / "modelRozmiar": jeśli opis podaje wzorzec typu "Model ma 184 cm i nosi rozmiar L", wpisz 184 i "L". Inaczej null.
-- "refRozmiarWTabeli": TYLKO gdy podano UBRANIE REFERENCYJNE, znasz PEWNIE wymiary tej marki+rozmiaru i etykieta jest jedną z tych w "tabela" (np. "M", "32"). Przy jakiejkolwiek wątpliwości (nieznana / lokalna marka, dziwna nazwa lub rozmiar) → null. Nie zgaduj z sylwetki klienta.
+- "refRozmiarWTabeli": gdy podano UBRANIE REFERENCYJNE marki rozpoznawalnej (sieciówka / duża marka), wpisz rozmiar z "tabela" (np. "M", "32"), który leżałby najbardziej podobnie. null tylko dla marki naprawdę nieznanej / lokalnej / handmade albo gdy nazwa/rozmiar to przypadkowy ciąg znaków. Nie zgaduj z sylwetki klienta.
 `;
 }
 
@@ -381,6 +381,27 @@ export type ResolveResult = {
   /** ustawione, gdy rozmiar wyszedł z porównania do ubrania referencyjnego. */
   matchedReference: { brand: string; size: string } | null;
 };
+
+// Sito na oczywisty bełkot w nazwie marki podanej przez klienta (losowy ciąg
+// znaków typu „sdfsdfsdgfaf"). To NIE jest walidacja „czy marka istnieje" —
+// model dostaje osobną instrukcję o rozpoznawalności. Tu wyłapujemy tylko
+// wpisy, których żadna prawdziwa nazwa marki nie przypomina, żeby nie ufać im
+// nawet gdy model mimo wszystko zwróci rozmiar.
+function looksLikeRealBrandName(raw: string): boolean {
+  const s = raw.trim().toLowerCase();
+  if (s.length < 2) return false;
+  const tokens = s
+    .split(/[\s\-&.’'/]+/)
+    .filter((x) => x.length >= 3 && !/\d/.test(x));
+  if (tokens.length === 0) return true; // same inicjały / cyfry (H&M, 4F, A.P.C.)
+  const vowel = /[aeiouyàáâäãåèéêëìíîïòóôöõùúûüæøœ]/;
+  return tokens.every(
+    (tok) =>
+      vowel.test(tok) && // token bez samogłoski = bełkot
+      !/[bcdfghjklmnpqrstvwxzćłńśźż]{5,}/.test(tok) && // 5+ spółgłosek z rzędu
+      !/(.)\1\1\1/.test(tok), // 4× ta sama litera z rzędu
+  );
+}
 
 export function resolveSize(input: ResolveInput): ResolveResult | null {
   const { extraction, height, weight, gender, bodyType, fit } = input;
@@ -493,18 +514,24 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
 
   // --- Ubranie referencyjne klienta („mam Nike L, leży idealnie") ---
   // Porównanie UBRANIE-DO-UBRANIA; najsilniejszy sygnał (od klienta, nie marki).
-  // ZABEZPIECZENIE: gdy model nie zna marki, zwraca null (patrz prompt) → tu nie
-  // wchodzimy. Gdy zwróci etykietę spoza tabeli → rIdx < 0 → nie wchodzimy.
-  // Gdy zwróci rozmiar rażąco sprzeczny z obwodem ciała (halucynacja) →
-  // odrzucamy go i lecimy dalej zwykłą ścieżką obwodową.
+  // ZABEZPIECZENIA, po kolei: (1) nazwa marki to bełkot → nie ufamy;
+  // (2) model zwrócił etykietę spoza tabeli → rIdx < 0 → nie wchodzimy;
+  // (3) rozmiar rażąco sprzeczny z obwodem ciała → odrzucamy i lecimy dalej.
   if (input.referenceGarment && extraction.refEquivalentSize) {
     const want = extraction.refEquivalentSize.toUpperCase().replace(/\s+/g, "");
     const rIdx = rows.findIndex(
       (r) => r.size.toUpperCase().replace(/\s+/g, "") === want,
     );
+    const brandOk = looksLikeRealBrandName(input.referenceGarment.brand);
+    if (!brandOk) {
+      console.warn(
+        "[resolveSize] ubranie referencyjne odrzucone — nazwa marki wygląda na przypadkową",
+        { brand: input.referenceGarment.brand },
+      );
+    }
 
     // Zdroworozsądkowa kontrola: najbliższy rozmiar wg samego obwodu ciała.
-    let refTrusted = rIdx >= 0;
+    let refTrusted = rIdx >= 0 && brandOk;
     if (rIdx >= 0 && usable.length >= 2) {
       const centerEase = (easeLo + easeHi) / 2;
       const target = bodyPrimary + centerEase;
