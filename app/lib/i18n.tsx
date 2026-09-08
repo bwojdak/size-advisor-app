@@ -71,9 +71,12 @@ const messages: Record<Locale, Record<string, string>> = {
     "analytics.purchases.title": "Ostatnie zakupy z rekomendacji",
     "analytics.purchases.col.date": "Data",
     "analytics.purchases.col.size": "Rozmiar",
-    "analytics.returns.title": "Szacowane uniknięte zwroty",
-    "analytics.returns.body":
-      "Założenie modelowe: ok. 30% zakupów z polecanym rozmiarem to zwroty, które nie wystąpiły. To nie jest wartość zmierzona w Twoim sklepie.",
+    "analytics.returns.rate.title": "Zwroty zamówień z rekomendacji",
+    "analytics.returns.rate.body":
+      "Zmierzone: {n} z {m} zakupów z polecanym rozmiarem zostało zwróconych. Podaj swój ogólny wskaźnik zwrotów w Ustawieniach, aby zobaczyć szacunek unikniętych zwrotów.",
+    "analytics.returns.avoided.title": "Szacowane uniknięte zwroty",
+    "analytics.returns.avoided.body":
+      "Zamówienia z rekomendacji zwracane w {widget}% vs Twój ogólny {base}%. Różnica × liczba zakupów = szacunek zwrotów, które nie wystąpiły.",
     "analytics.revenue.title": "Przychód z rekomendacji",
     "analytics.revenue.body":
       "Suma wartości zamówień, w których klient kupił polecany rozmiar (z widżetu).",
@@ -319,6 +322,11 @@ const messages: Record<Locale, Record<string, string>> = {
       "Dodaje w widżecie opcjonalne, rozwijane pytanie: klient podaje markę i rozmiar ubrania tego samego typu, które leży na nim idealnie. AI porównuje ubranie do ubrania (nie liczy obwodu ciała) i wskazuje rozmiar z tabeli tego produktu, który leżałby podobnie. Plan Growth i wyższy.",
     "settings.garment.toggle": "Pytaj klienta o dobrze leżące ubranie",
 
+    "settings.returnRate.title": "Twój ogólny wskaźnik zwrotów",
+    "settings.returnRate.desc":
+      "Podaj procent zamówień, które zwykle wracają do Ciebie (z całego sklepu, nie tylko z rekomendacji). Dzięki temu w analityce policzymy szacowaną liczbę zwrotów, których uniknięto — porównując zamówienia z rekomendacją do tego poziomu. Zostaw puste, jeśli nie wiesz. Plan Growth i wyższy.",
+    "settings.returnRate.label": "Wskaźnik zwrotów",
+
     "settings.widgetLang.desc":
       "Domyślnie widżet dziedziczy język sklepu. Możesz go tu wymusić na stałe.",
     "settings.widgetLang.label": "Język widżetu w sklepie",
@@ -419,9 +427,12 @@ const messages: Record<Locale, Record<string, string>> = {
     "analytics.purchases.title": "Recent purchases from recommendations",
     "analytics.purchases.col.date": "Date",
     "analytics.purchases.col.size": "Size",
-    "analytics.returns.title": "Estimated returns avoided",
-    "analytics.returns.body":
-      "Modeling assumption: ~30% of purchases with the recommended size are returns that did not happen. This is not a value measured in your store.",
+    "analytics.returns.rate.title": "Returns on recommendation orders",
+    "analytics.returns.rate.body":
+      "Measured: {n} of {m} purchases with the recommended size were returned. Enter your overall return rate in Settings to see an estimate of avoided returns.",
+    "analytics.returns.avoided.title": "Estimated returns avoided",
+    "analytics.returns.avoided.body":
+      "Recommendation orders returned at {widget}% vs your overall {base}%. The gap × purchases = estimate of returns that did not happen.",
     "analytics.revenue.title": "Revenue from recommendations",
     "analytics.revenue.body":
       "Total value of orders where the shopper bought the recommended size (via the widget).",
@@ -666,6 +677,11 @@ const messages: Record<Locale, Record<string, string>> = {
     "settings.garment.desc":
       "Adds an optional, collapsible question in the widget: the shopper enters the brand and size of a garment of the same type that fits them perfectly. The AI compares garment to garment (it does not estimate body girth) and picks the size in this product's chart that would fit most similarly. Growth plan and up.",
     "settings.garment.toggle": "Ask the shopper for a well-fitting garment",
+
+    "settings.returnRate.title": "Your overall return rate",
+    "settings.returnRate.desc":
+      "Enter the percentage of orders that normally come back to you (store-wide, not just recommendation orders). Analytics then estimates how many returns were avoided — comparing recommendation orders against this baseline. Leave blank if you don't know. Growth plan and up.",
+    "settings.returnRate.label": "Return rate",
 
     "settings.widgetLang.desc":
       "By default the widget inherits the store language. You can pin it here.",

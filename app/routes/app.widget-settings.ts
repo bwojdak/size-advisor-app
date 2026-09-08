@@ -19,6 +19,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     askGarmentMatch?: boolean;
     widgetLanguage?: string;
     widgetCustomCss?: string;
+    baselineReturnRate?: number | string | null;
   };
 
   const data: {
@@ -26,6 +27,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     askGarmentMatch?: boolean;
     widgetLanguage?: string;
     widgetCustomCss?: string | null;
+    baselineReturnRate?: number | null;
   } = {};
 
   if (typeof body.askFitPreference === "boolean") {
@@ -76,6 +78,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     data.widgetCustomCss = css.trim() || null;
   }
 
+  if (body.baselineReturnRate !== undefined) {
+    if (!caps.conversionAnalytics) {
+      return Response.json(
+        { error: t("gate.locked_from", { plan: "Growth" }) },
+        { status: 403 },
+      );
+    }
+    // Merchant wpisuje procent (0–100). Trzymamy jako ułamek 0–1; puste = null.
+    const raw =
+      body.baselineReturnRate === null || body.baselineReturnRate === ""
+        ? null
+        : Number(body.baselineReturnRate);
+    data.baselineReturnRate =
+      raw != null && Number.isFinite(raw) && raw > 0 && raw <= 100
+        ? Math.round((raw / 100) * 1000) / 1000
+        : null;
+  }
+
   const updated = await db.shopSettings.update({
     where: { id: settings.id },
     data,
@@ -87,5 +107,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     askGarmentMatch: updated.askGarmentMatch,
     widgetLanguage: updated.widgetLanguage,
     widgetCustomCss: updated.widgetCustomCss ?? "",
+    baselineReturnRate: updated.baselineReturnRate,
   });
 };

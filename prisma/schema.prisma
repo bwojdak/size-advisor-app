@@ -46,6 +46,7 @@ model ShopSettings {
   askFitPreference Boolean   @default(false) // widżet pyta o preferencję dopasowania
   askGarmentMatch  Boolean   @default(false) // widżet pyta o dobrze leżące ubranie referencyjne
   widgetLanguage   String    @default("auto") // język widżetu: "auto" (jak sklep) | "pl" | "en"
+  baselineReturnRate Float?  // ogólny wskaźnik zwrotów sklepu (0–1), podany przez merchanta — do liczenia „unikniętych zwrotów"
   widgetCustomCss  String?   // własny CSS wstrzykiwany do widżetu (Growth+)
   productRules     ProductRule[]
   productAnalyses  ProductAnalysis[]
@@ -112,5 +113,7 @@ model AdvisorLog {
   orderTotal      Float?       // wartość zamówienia z webhooka orders/create
   orderCurrency   String?
   purchasedAt     DateTime?
+  returned        Boolean      @default(false) // zamówienie zwrócone (refunds/create)
+  returnedAt      DateTime?
   createdAt       DateTime     @default(now())
 }

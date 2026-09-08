@@ -21,7 +21,6 @@ import { useI18n } from "../lib/i18n";
 import { LockedFeature } from "../components/LockedFeature";
 
 const CHART_DAYS = 30;
-const RETURNS_RATE = 0.3;
 const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL"];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -46,6 +45,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       purchasedAt: true,
       orderTotal: true,
       orderCurrency: true,
+      returned: true,
     },
     orderBy: { createdAt: "desc" },
     take: 20000,
@@ -54,6 +54,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const total = rows.length;
   const addedToCart = rows.filter((r) => r.addedToCart).length;
   const purchased = rows.filter((r) => r.purchased).length;
+  const returned = rows.filter((r) => r.returned).length;
+  // Realny wskaźnik zwrotów na zamówieniach z rekomendacji (0–1).
+  const widgetReturnRate = purchased > 0 ? returned / purchased : null;
+  // Ogólny wskaźnik zwrotów sklepu podany przez merchanta (0–1) — do liczenia
+  // „unikniętych zwrotów". Bez niego pokazujemy tylko realny odsetek.
+  const baselineReturnRate =
+    typeof settings.baselineReturnRate === "number" &&
+    settings.baselineReturnRate > 0 &&
+    settings.baselineReturnRate <= 1
+      ? settings.baselineReturnRate
+      : null;
+  const avoidedReturns =
+    baselineReturnRate != null && widgetReturnRate != null
+      ? Math.max(
+          0,
+          Math.round(purchased * (baselineReturnRate - widgetReturnRate)),
+        )
+      : null;
 
   // Przychód przypisany — suma wartości zamówień z zakupem polecanego rozmiaru,
   // rozbita po walucie (zwykle jedna na sklep).
@@ -164,6 +182,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     total,
     addedToCart,
     purchased,
+    returned,
+    widgetReturnRate,
+    baselineReturnRate,
+    avoidedReturns,
     revenue,
     perDay,
     sizeAgg,
@@ -330,6 +352,10 @@ export default function AnalyticsPage() {
     total,
     addedToCart,
     purchased,
+    returned,
+    widgetReturnRate,
+    baselineReturnRate,
+    avoidedReturns,
     revenue,
     perDay,
     sizeAgg,
@@ -540,13 +566,27 @@ export default function AnalyticsPage() {
                 <Card>
                   <BlockStack gap="200">
                     <Text as="h2" variant="headingMd">
-                      {t("analytics.returns.title")}
+                      {avoidedReturns != null
+                        ? t("analytics.returns.avoided.title")
+                        : t("analytics.returns.rate.title")}
                     </Text>
                     <Text as="p" variant="heading2xl" fontWeight="bold">
-                      ~{Math.round(purchased * RETURNS_RATE)}
+                      {avoidedReturns != null
+                        ? `~${avoidedReturns}`
+                        : widgetReturnRate != null
+                          ? `${Math.round(widgetReturnRate * 100)}%`
+                          : "—"}
                     </Text>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      {t("analytics.returns.body")}
+                      {avoidedReturns != null
+                        ? t("analytics.returns.avoided.body", {
+                            widget: Math.round((widgetReturnRate ?? 0) * 100),
+                            base: Math.round((baselineReturnRate ?? 0) * 100),
+                          })
+                        : t("analytics.returns.rate.body", {
+                            n: returned,
+                            m: purchased,
+                          })}
                     </Text>
                   </BlockStack>
                 </Card>

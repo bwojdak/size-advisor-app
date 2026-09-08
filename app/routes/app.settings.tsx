@@ -40,6 +40,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     widgetLanguage: settings.widgetLanguage ?? "auto",
     customCssAvailable: caps.customCss,
     widgetCustomCss: settings.widgetCustomCss ?? "",
+    analyticsAvailable: caps.conversionAnalytics,
+    baselineReturnRate:
+      typeof settings.baselineReturnRate === "number"
+        ? Math.round(settings.baselineReturnRate * 100)
+        : "",
   };
 };
 
@@ -82,6 +87,8 @@ export default function SettingsPage() {
     widgetLanguage,
     customCssAvailable,
     widgetCustomCss,
+    analyticsAvailable,
+    baselineReturnRate,
   } = useLoaderData<typeof loader>();
   const { t, locale } = useI18n();
   const revalidator = useRevalidator();
@@ -163,6 +170,42 @@ export default function SettingsPage() {
       );
     } finally {
       setSavingCss(false);
+    }
+  };
+
+  const [returnRate, setReturnRate] = useState(
+    baselineReturnRate === "" ? "" : String(baselineReturnRate),
+  );
+  const [savedReturnRate, setSavedReturnRate] = useState(
+    baselineReturnRate === "" ? "" : String(baselineReturnRate),
+  );
+  const [savingReturnRate, setSavingReturnRate] = useState(false);
+  const [returnRateError, setReturnRateError] = useState<string | null>(null);
+
+  const saveReturnRate = async () => {
+    setSavingReturnRate(true);
+    setReturnRateError(null);
+    try {
+      const json = await authFetch(
+        "/app/widget-settings",
+        { baselineReturnRate: returnRate === "" ? null : returnRate },
+        locale,
+      );
+      const next =
+        typeof json.baselineReturnRate === "number"
+          ? String(Math.round(json.baselineReturnRate * 100))
+          : "";
+      setReturnRate(next);
+      setSavedReturnRate(next);
+      toast(t("settings.brand.saved"));
+    } catch (err) {
+      setReturnRateError(
+        err instanceof Error && err.message
+          ? err.message
+          : t("settings.error.saveFailed"),
+      );
+    } finally {
+      setSavingReturnRate(false);
     }
   };
 
@@ -557,6 +600,59 @@ export default function SettingsPage() {
                       label={t("settings.garment.toggle")}
                       checked={false}
                       onChange={() => {}}
+                    />
+                  </LockedFeature>
+                )}
+              </BlockStack>
+            </Card>
+
+            <Card>
+              <BlockStack gap="300">
+                <Text as="h2" variant="headingMd">
+                  {t("settings.returnRate.title")}
+                </Text>
+                <Text as="p" tone="subdued" variant="bodySm">
+                  {t("settings.returnRate.desc")}
+                </Text>
+                {analyticsAvailable ? (
+                  <>
+                    <InlineStack gap="300" blockAlign="end" wrap>
+                      <Box minWidth="160px">
+                        <TextField
+                          label={t("settings.returnRate.label")}
+                          type="number"
+                          suffix="%"
+                          min={0}
+                          max={100}
+                          value={returnRate}
+                          onChange={setReturnRate}
+                          autoComplete="off"
+                        />
+                      </Box>
+                      <Button
+                        variant="primary"
+                        onClick={saveReturnRate}
+                        loading={savingReturnRate}
+                        disabled={returnRate === savedReturnRate}
+                      >
+                        {t("settings.brand.save")}
+                      </Button>
+                    </InlineStack>
+                    {returnRateError ? (
+                      <Text as="p" tone="critical" variant="bodySm">
+                        {returnRateError}
+                      </Text>
+                    ) : null}
+                  </>
+                ) : (
+                  <LockedFeature note={t("gate.locked_from", { plan: "Growth" })}>
+                    <TextField
+                      label={t("settings.returnRate.label")}
+                      type="number"
+                      suffix="%"
+                      value=""
+                      onChange={() => {}}
+                      autoComplete="off"
                     />
                   </LockedFeature>
                 )}
