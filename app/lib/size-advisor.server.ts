@@ -872,9 +872,15 @@ function buildExplanation(
         `Rozmiar ${r.size} wg wzorca marki: model ${r.modelRef.height} cm nosi ${r.modelRef.size}, skorygowano o Twój wzrost ${ctx.height} cm.`,
       );
     } else if (r.mode === "length") {
-      parts.push(
-        `Rozmiar ${r.size}: długość ${r.chosenValue} cm mieści się w zakresie ${lo}–${hi} cm zalecanym przy wzroście ${ctx.height} cm dla kroju ${cut}.`,
-      );
+      if (r.chosenValue >= lo && r.chosenValue <= hi) {
+        parts.push(
+          `Rozmiar ${r.size}: długość ${r.chosenValue} cm mieści się w zakresie ${lo}–${hi} cm zalecanym przy wzroście ${ctx.height} cm dla kroju ${cut}.`,
+        );
+      } else {
+        parts.push(
+          `Rozmiar ${r.size}: to najbliższy dostępny rozmiar. Zalecana długość przy wzroście ${ctx.height} cm dla kroju ${cut} to ${lo}–${hi} cm, a ten rozmiar ma ${r.chosenValue} cm.`,
+        );
+      }
     } else {
       const where = r.mode === "waist" ? "w pasie" : "w klatce";
       parts.push(
@@ -910,9 +916,15 @@ function buildExplanation(
         `Size ${r.size} from the brand reference: a ${r.modelRef.height} cm model wears ${r.modelRef.size}, adjusted for your height of ${ctx.height} cm.`,
       );
     } else if (r.mode === "length") {
-      parts.push(
-        `Size ${r.size}: length ${r.chosenValue} cm is within the ${lo}–${hi} cm range recommended for a height of ${ctx.height} cm in a ${cut} fit.`,
-      );
+      if (r.chosenValue >= lo && r.chosenValue <= hi) {
+        parts.push(
+          `Size ${r.size}: length ${r.chosenValue} cm is within the ${lo}–${hi} cm range recommended for a height of ${ctx.height} cm in a ${cut} fit.`,
+        );
+      } else {
+        parts.push(
+          `Size ${r.size}: this is the closest available size. The recommended length for a height of ${ctx.height} cm in a ${cut} fit is ${lo}–${hi} cm; this size is ${r.chosenValue} cm.`,
+        );
+      }
     } else {
       const where = r.mode === "waist" ? "waist" : "chest";
       parts.push(
