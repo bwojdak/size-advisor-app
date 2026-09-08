@@ -216,7 +216,7 @@ function estimateWaist(
   build: string,
 ): number {
   const chest = estimateChest(h, w, gender, build);
-  const drop = gender === "female" ? 18 : 13;
+  const drop = gender === "female" ? 18 : 16;
   // Sylwetka atletyczna = wyraźny V-taper: klatka w górę, ale pas mocno w dół.
   const buildAdj =
     build === "plus" ? 8 : build === "athletic" ? -4 : build === "slim" ? -2 : 0;
@@ -619,9 +619,14 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
     (cut === "oversize" ||
       (usable.length >= 2 && smallestPrimary > bodyPrimary + 18)) &&
     lengthDimFn != null;
+  // Dół z pasem na gumce gradujemy po DŁUGOŚCI nogawki tylko wtedy, gdy nogawka
+  // faktycznie się różni między rozmiarami (≥5 cm rozrzutu). Inaczej (np. jersey
+  // jorts, gdzie nogawka to 63–66 cm) lecimy ścieżką obwodową z zapasem na gumę.
+  const lengthSpread = lengthDimFn ? spread(lengthDimFn) : 0;
   const bottomElastic =
     useWaist &&
     lengthDimFn != null &&
+    lengthSpread >= 5 &&
     usable.length >= 2 &&
     (extraction.elasticWaist ||
       usable.every((r) => (primaryOf(r) as number) < bodyPrimary - 3));
@@ -652,7 +657,9 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
     // klient 5 cm wyższy od modela dostawał od razu rozmiar wyżej.
     const HEIGHT_PER_SIZE = 12;
     const raw = (height - extraction.modelHeight!) / HEIGHT_PER_SIZE;
-    const step = Math.round(raw);
+    // Zaokrąglenie „połowa od zera" — inaczej Math.round(-0.5)=0 dawało lekki
+    // bias w górę (klient dokładnie pół rozmiaru niższy od modela → rozmiar modela).
+    const step = raw >= 0 ? Math.round(raw) : -Math.round(-raw);
     const idx = clamp(baseIdx + step, 0, pool.length - 1);
     target = valueOf(pool[idx]);
     window = [target - 1, target + 1];
@@ -671,7 +678,9 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
     const lens = pool.map(valueOf).sort((a, b) => a - b);
     const mid = (lens.length - 1) / 2;
     const median = (lens[Math.floor(mid)] + lens[Math.ceil(mid)]) / 2;
-    target = Math.round(median + (height - 178) * 0.38);
+    // 0.25 cm docelowej długości na 1 cm wzrostu → ~1 rozmiar na 7–8 cm.
+    // Wyżej (0.38) boxy topy skakały o rozmiar co ~4 cm wzrostu.
+    target = Math.round(median + (height - 178) * 0.25);
     window = [target - TOP_LENGTH_TOL, target + TOP_LENGTH_TOL];
     candRows = pool.filter(
       (r) => valueOf(r) >= window[0] && valueOf(r) <= window[1],
@@ -679,7 +688,14 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
     if (candRows.length === 0) candRows = nearest(pool, valueOf, window);
   } else {
     // --- Tryb: po obwodzie + luz kroju ---
-    window = [bodyPrimary + easeLo, bodyPrimary + easeHi];
+    // Pas na gumce / dzianina na dole: liczba w tabeli jest „na luźno" i sporo
+    // mniejsza od ciała (materiał się naciąga). Porównujemy ciało do pasa
+    // noszonego z lekkim naciągiem (÷1.10) i dajemy szersze okno.
+    const elasticBottom =
+      useWaist && (extraction.elasticWaist || extraction.stretch);
+    const bodyEff = elasticBottom ? bodyPrimary / 1.15 : bodyPrimary;
+    const [bLo, bHi] = elasticBottom ? [-6, 7] : [easeLo, easeHi];
+    window = [bodyEff + bLo, bodyEff + bHi];
     target = (window[0] + window[1]) / 2;
     valueOf = (r) => primaryOf(r) as number;
     candRows = usable.filter(
@@ -725,10 +741,13 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
       tieBrokenBy = nIdx < candRows.length - 1 ? "fit" : "midpoint";
     } else {
       chosen = neutral;
-      // Remis (≤1 cm) w kroju regular/relaxed dla GÓRY → wybierz większy:
-      // za mały jest tam gorszym błędem niż za duży. Nie dotyczy dołu (pas).
+      // Remis (≤0.5 cm) w kroju regular/relaxed dla GÓRY liczonej PO OBWODZIE →
+      // wybierz większy: ciasno w klatce boli bardziej niż lekki nadmiar. NIE w
+      // trybie długościowym (tam remis rozstrzygamy na mniejszy — dla oversize
+      // to i tak zostaje „na luźno", a nie pakujemy drobnej sylwetki w większy).
       if (
         !useWaist &&
+        mode !== "length" &&
         (cut === "regular" || cut === "relaxed") &&
         byDist[1] &&
         Math.abs(valueOf(byDist[1]) - target) -
@@ -774,9 +793,11 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
   // dopasowanego (slim/fitted) luz minimalny jest ujemny – ma przylegać.
   {
     const heavy = bodyType === "plus" ? 7 : bodyType === "athletic" ? 5 : 0;
+    // Tęższa sylwetka (plus/athletic) potrzebuje dodatniego luzu nawet w kroju
+    // dopasowanym — inaczej kotwica po wzroście wpycha ją w za mały rozmiar.
     const minEase =
       cut === "slim"
-        ? -3 + Math.max(0, heavy - 3)
+        ? -3 + Math.max(0, heavy)
         : cut === "regular"
           ? 3 + heavy
           : 2 + heavy; // relaxed / oversize – i tak jest luzu w nadmiarze
@@ -796,9 +817,9 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
       } else {
         const c = r.chest;
         if (!c) break;
-        // Dzianina / elastan naciąga ~6 cm w klatce — rozmiar z lekko ujemnym
-        // luzem przy takim materiale nadal siądzie.
-        const give = extraction.stretch ? 6 : 0;
+        // Dzianina / elastan naciąga ~3 cm w klatce — rozmiar z lekko ujemnym
+        // luzem przy takim materiale nadal siądzie (ale nie „wciskamy na siłę").
+        const give = extraction.stretch ? 3 : 0;
         if (c + give >= bodyPrimary + minEase) {
           chosen = r;
           break;
