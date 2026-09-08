@@ -10,7 +10,11 @@ embedded = true
 scopes = "read_orders,write_metaobject_definitions,write_metaobjects,write_products"
 
 [auth]
-redirect_urls = [ "https://size-advisor-app-production-7e87.up.railway.app/api/auth" ]
+redirect_urls = [
+  "https://size-advisor-app-production-7e87.up.railway.app/auth/callback",
+  "https://size-advisor-app-production-7e87.up.railway.app/auth/shopify/callback",
+  "https://size-advisor-app-production-7e87.up.railway.app/api/auth/callback"
+]
 
 [webhooks]
 api_version = "2026-10"
