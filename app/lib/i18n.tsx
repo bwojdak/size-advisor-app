@@ -73,7 +73,9 @@ const messages: Record<Locale, Record<string, string>> = {
     "analytics.purchases.col.size": "Rozmiar",
     "analytics.returns.rate.title": "Zwroty zamówień z rekomendacji",
     "analytics.returns.rate.body":
-      "Zmierzone: {n} z {m} zakupów z polecanym rozmiarem zostało zwróconych. Podaj swój ogólny wskaźnik zwrotów w Ustawieniach, aby zobaczyć szacunek unikniętych zwrotów.",
+      "Zmierzone: {n} z {m} zakupów z polecanym rozmiarem zostało zwróconych.",
+    "analytics.returns.rate.hint":
+      " Podaj swój ogólny wskaźnik zwrotów w Ustawieniach, aby zobaczyć szacunek unikniętych zwrotów.",
     "analytics.returns.avoided.title": "Szacowane uniknięte zwroty",
     "analytics.returns.avoided.body":
       "Zamówienia z rekomendacji zwracane w {widget}% vs Twój ogólny {base}%. Różnica × liczba zakupów = szacunek zwrotów, które nie wystąpiły.",
@@ -429,7 +431,9 @@ const messages: Record<Locale, Record<string, string>> = {
     "analytics.purchases.col.size": "Size",
     "analytics.returns.rate.title": "Returns on recommendation orders",
     "analytics.returns.rate.body":
-      "Measured: {n} of {m} purchases with the recommended size were returned. Enter your overall return rate in Settings to see an estimate of avoided returns.",
+      "Measured: {n} of {m} purchases with the recommended size were returned.",
+    "analytics.returns.rate.hint":
+      " Enter your overall return rate in Settings to see an estimate of avoided returns.",
     "analytics.returns.avoided.title": "Estimated returns avoided",
     "analytics.returns.avoided.body":
       "Recommendation orders returned at {widget}% vs your overall {base}%. The gap × purchases = estimate of returns that did not happen.",

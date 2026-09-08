@@ -533,7 +533,10 @@ export default function AnalyticsPage() {
             </Card>
 
             {conv ? (
-              <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
+              <InlineGrid
+                columns={{ xs: 1, sm: 2, md: avoidedReturns != null ? 3 : 2 }}
+                gap="400"
+              >
                 <Card>
                   <BlockStack gap="200">
                     <Text as="h2" variant="headingMd">
@@ -566,30 +569,42 @@ export default function AnalyticsPage() {
                 <Card>
                   <BlockStack gap="200">
                     <Text as="h2" variant="headingMd">
-                      {avoidedReturns != null
-                        ? t("analytics.returns.avoided.title")
-                        : t("analytics.returns.rate.title")}
+                      {t("analytics.returns.rate.title")}
                     </Text>
                     <Text as="p" variant="heading2xl" fontWeight="bold">
-                      {avoidedReturns != null
-                        ? `~${avoidedReturns}`
-                        : widgetReturnRate != null
-                          ? `${Math.round(widgetReturnRate * 100)}%`
-                          : "—"}
+                      {widgetReturnRate != null
+                        ? `${Math.round(widgetReturnRate * 100)}%`
+                        : "—"}
                     </Text>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      {avoidedReturns != null
-                        ? t("analytics.returns.avoided.body", {
-                            widget: Math.round((widgetReturnRate ?? 0) * 100),
-                            base: Math.round((baselineReturnRate ?? 0) * 100),
-                          })
-                        : t("analytics.returns.rate.body", {
-                            n: returned,
-                            m: purchased,
-                          })}
+                      {t("analytics.returns.rate.body", {
+                        n: returned,
+                        m: purchased,
+                      })}
+                      {avoidedReturns == null
+                        ? t("analytics.returns.rate.hint")
+                        : ""}
                     </Text>
                   </BlockStack>
                 </Card>
+                {avoidedReturns != null ? (
+                  <Card>
+                    <BlockStack gap="200">
+                      <Text as="h2" variant="headingMd">
+                        {t("analytics.returns.avoided.title")}
+                      </Text>
+                      <Text as="p" variant="heading2xl" fontWeight="bold">
+                        {`~${avoidedReturns}`}
+                      </Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        {t("analytics.returns.avoided.body", {
+                          widget: Math.round((widgetReturnRate ?? 0) * 100),
+                          base: Math.round((baselineReturnRate ?? 0) * 100),
+                        })}
+                      </Text>
+                    </BlockStack>
+                  </Card>
+                ) : null}
               </InlineGrid>
             ) : null}
 
