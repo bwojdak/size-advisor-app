@@ -227,6 +227,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         })
       : null;
 
+    // Produkt zmapowany na współdzielony system rozmiarów → tabela i analiza
+    // biorą się z systemu, nie z reguły produktu.
+    const sizingSystem = productRule?.sizingSystemId
+      ? await db.sizingSystem.findUnique({
+          where: { id: productRule.sizingSystemId },
+        })
+      : null;
+    const chartJson = sizingSystem
+      ? sizingSystem.extractionJson
+      : (productRule?.extractionJson ?? null);
+    const chartVersion = sizingSystem
+      ? sizingSystem.extractionVersion
+      : productRule?.extractionVersion;
+    const chartSizeData = sizingSystem
+      ? sizingSystem.parsedSizeData
+      : (productRule?.parsedSizeData ?? null);
+    const chartNotes = sizingSystem
+      ? sizingSystem.customNotes
+      : (productRule?.customNotes ?? null);
+
     // Cache analizy dla produktów, których admin nie skonfigurował ręcznie.
     const productAnalysis =
       numericProductId && !productRule
@@ -255,6 +275,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       productDescription: productDescription || "",
       brandStyleNotes: brandStyleNotes || "",
       productRuleUpdatedAt: productRule?.updatedAt?.toISOString() || "",
+      sizingSystemUpdatedAt: sizingSystem?.updatedAt?.toISOString() || "",
     });
 
     let finalSize: string;
@@ -268,7 +289,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       bodyType,
       fit,
       locale: responseLocale,
-      allowKorekta: Boolean(brandStyleNotes || productRule?.customNotes?.trim()),
+      allowKorekta: Boolean(brandStyleNotes || chartNotes?.trim()),
       referenceGarment,
     };
 
@@ -282,11 +303,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       // Pomijamy, gdy klient podał ubranie referencyjne (potrzebny świeży
       // „refRozmiarWTabeli”) albo gdy zmieniła się wersja logiki ekstrakcji.
       !referenceGarment &&
-      productRule?.extractionJson &&
-      productRule.extractionVersion === EXTRACTION_VERSION &&
-      parseStoredExtraction(productRule.extractionJson)
+      chartJson &&
+      chartVersion === EXTRACTION_VERSION &&
+      parseStoredExtraction(chartJson)
     ) {
-      const stored = parseStoredExtraction(productRule.extractionJson)!;
+      const stored = parseStoredExtraction(chartJson)!;
       const decided = decideSize(stored, decision);
       finalSize = decided.size;
       finalExplanation = decided.explanation;
@@ -307,19 +328,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalDetail = decided.explanationDetail;
       setCachedRecommendation(cacheKey, finalSize, finalExplanation, finalDetail);
     } else {
-      // Zdjęcie rozmiarówki tylko w planach z multimodalnym AI.
-      const useImage = caps.sizeChartImageAI && Boolean(productRule?.sizeChartImage);
+      // Zdjęcie rozmiarówki tylko w planach z multimodalnym AI i tylko dla
+      // produktu z własną tabelą (system rozmiarów jest tekstowy).
+      const useImage =
+        caps.sizeChartImageAI &&
+        !sizingSystem &&
+        Boolean(productRule?.sizeChartImage);
 
       const prompt = buildSizeAdvisorPrompt({
-        productTitle,
-        productDescription,
+        productTitle: sizingSystem ? "" : productTitle,
+        productDescription: sizingSystem ? "" : productDescription,
         gender,
         height,
         weight,
         bodyType,
         brandStyleNotes,
-        productSizeData: productRule?.parsedSizeData,
-        productNotes: productRule?.customNotes,
+        productSizeData: chartSizeData,
+        productNotes: chartNotes,
         hasSizeChartImage: useImage,
         fitPreference: fit,
         referenceGarment,
@@ -377,7 +402,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       // ProductAnalysis (osobne od limitu planu i listy w panelu).
       if (!referenceGarment) {
         try {
-          if (productRule) {
+          if (sizingSystem) {
+            await db.sizingSystem.update({
+              where: { id: sizingSystem.id },
+              data: {
+                extractionJson: JSON.stringify(result.rawJson),
+                extractionAt: new Date(),
+                extractionModel: model,
+                extractionVersion: EXTRACTION_VERSION,
+                extractionError: null,
+              },
+            });
+          } else if (productRule) {
             await db.productRule.update({
               where: { id: productRule.id },
               data: {

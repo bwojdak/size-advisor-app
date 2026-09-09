@@ -50,6 +50,7 @@ model ShopSettings {
   widgetCustomCss  String?   // własny CSS wstrzykiwany do widżetu (Growth+)
   productRules     ProductRule[]
   productAnalyses  ProductAnalysis[]
+  sizingSystems    SizingSystem[]
   advisorLogs      AdvisorLog[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -64,6 +65,12 @@ model ProductRule {
   parsedSizeData String?      // Tabela wymiarów wpisana / wklejona tekstem
   customNotes    String?      // Notatki dla AI, np. "zaniżona rozmiarówka"
   sizeChartImage String?      // Zdjęcie rozmiarówki jako data URL (base64)
+
+  // Zamiast własnej tabeli produkt może wskazywać na współdzielony system
+  // rozmiarów (np. "Standardowe t-shirty"). Wtedy pola tabeli powyżej są
+  // ignorowane, a analiza brana jest z systemu.
+  sizingSystemId String?
+  sizingSystem   SizingSystem? @relation(fields: [sizingSystemId], references: [id], onDelete: SetNull)
 
   // Jednorazowa analiza produktu przez AI (config-time). Przy zapytaniu klienta
   // używamy jej bez wołania modelu; przeliczamy tylko gdy zmieni się tabela /
@@ -95,6 +102,29 @@ model ProductAnalysis {
   analyzedAt        DateTime     @default(now())
 
   @@unique([shopId, productId])
+}
+
+// Współdzielona, nazwana rozmiarówka (np. "Standardowe t-shirty", "Bluzy boxy").
+// Jeden system → wiele produktów. Analiza AI robiona raz na system, nie na produkt.
+model SizingSystem {
+  id                String       @id @default(uuid())
+  shopId            String
+  shop              ShopSettings @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name              String
+  parsedSizeData    String?      // Tabela wymiarów wklejona tekstem
+  customNotes       String?      // Notatki dla AI dotyczące tego systemu
+
+  extractionJson    String?      // surowy JSON modelu (ChartExtraction źródłowy)
+  extractionAt      DateTime?
+  extractionModel   String?
+  extractionVersion Int?
+  extractionError   String?
+
+  rules             ProductRule[]
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@unique([shopId, name])
 }
 
 model AdvisorLog {

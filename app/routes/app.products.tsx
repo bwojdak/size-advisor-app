@@ -14,6 +14,7 @@ import {
   Page,
   ResourceItem,
   ResourceList,
+  Select,
   Text,
   TextField,
   Thumbnail,
@@ -54,6 +55,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const rules = await db.productRule.findMany({
     where: { shopId: settings.id },
     orderBy: { updatedAt: "desc" },
+  });
+
+  const sizingSystems = await db.sizingSystem.findMany({
+    where: { shopId: settings.id },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
   });
 
   const products: Record<
@@ -112,6 +119,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     rules,
     products,
     extractions,
+    sizingSystems,
     plan: settings.plan,
     productLimit: caps.productRuleLimit,
     sizeChartImageAI: caps.sizeChartImageAI,
@@ -142,8 +150,16 @@ async function submitRule(body: Record<string, unknown>, locale: Locale) {
 }
 
 export default function ProductsConfig() {
-  const { rules, products, extractions, plan, productLimit, sizeChartImageAI, bulkImport } =
-    useLoaderData<typeof loader>();
+  const {
+    rules,
+    products,
+    extractions,
+    sizingSystems,
+    plan,
+    productLimit,
+    sizeChartImageAI,
+    bulkImport,
+  } = useLoaderData<typeof loader>();
   const { t, locale } = useI18n();
   const revalidator = useRevalidator();
   const [reanalyzing, setReanalyzing] = useState(false);
@@ -389,6 +405,50 @@ export default function ProductsConfig() {
     }
   }, [editing, locale, revalidator, t]);
 
+  const currentSystemId =
+    editing && rulesById.get(editing.productId)?.sizingSystemId
+      ? (rulesById.get(editing.productId)!.sizingSystemId as string)
+      : "";
+
+  const mapToSystem = useCallback(
+    async (systemId: string) => {
+      if (!editing) return;
+      setBusy("save");
+      setActionError(null);
+      try {
+        const api = (
+          window as unknown as { shopify?: { idToken: () => Promise<string> } }
+        ).shopify;
+        const token = api ? await api.idToken() : null;
+        const res = await fetch(`/app/product-map?locale=${locale}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            products: [{ id: editing.productId, title: editing.title }],
+            sizingSystemId: systemId || null,
+          }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.error || "");
+        setEditing(null);
+        toast(t("products.saved"));
+        revalidator.revalidate();
+      } catch (err) {
+        setActionError(
+          err instanceof Error && err.message
+            ? err.message
+            : t("products.error.saveFailed"),
+        );
+      } finally {
+        setBusy(null);
+      }
+    },
+    [editing, locale, revalidator, t],
+  );
+
   const isNewRule = editing !== null && !rulesById.has(editing.productId);
   const ruleEmpty = !notes.trim() && !sizeText.trim() && !image;
   const editingExtraction =
@@ -603,7 +663,10 @@ export default function ProductsConfig() {
           content: t("products.modal.save"),
           onAction: save,
           loading: busy === "save",
-          disabled: busy === "delete" || (isNewRule && ruleEmpty),
+          disabled:
+            busy === "delete" ||
+            Boolean(currentSystemId) ||
+            (isNewRule && ruleEmpty),
         }}
         secondaryActions={
           rulesById.has(editing?.productId ?? "")
@@ -627,7 +690,29 @@ export default function ProductsConfig() {
               </Text>
             ) : null}
 
-            {editingExtraction ? (
+            {sizingSystems.length > 0 ? (
+              <Select
+                label={t("sizingSystems.pickerLabel")}
+                options={[
+                  { label: t("sizingSystems.pickerNone"), value: "" },
+                  ...sizingSystems.map((s) => ({ label: s.name, value: s.id })),
+                ]}
+                value={currentSystemId}
+                onChange={mapToSystem}
+                disabled={busy !== null}
+                helpText={
+                  currentSystemId
+                    ? t("sizingSystems.usingSystem", {
+                        name:
+                          sizingSystems.find((s) => s.id === currentSystemId)
+                            ?.name ?? "",
+                      })
+                    : undefined
+                }
+              />
+            ) : null}
+
+            {currentSystemId ? null : editingExtraction ? (
               <Box
                 padding="300"
                 background="bg-surface-secondary"
@@ -755,6 +840,12 @@ export default function ProductsConfig() {
               </Box>
             ) : null}
 
+            {currentSystemId ? (
+              <Text as="p" tone="subdued" variant="bodySm">
+                {t("sizingSystems.chartHelp")}
+              </Text>
+            ) : (
+            <>
             <TextField
               label={t("products.field.notes.label")}
               value={notes}
@@ -833,6 +924,8 @@ export default function ProductsConfig() {
                 )
               ) : null}
             </BlockStack>
+            </>
+            )}
           </BlockStack>
         </Modal.Section>
       </Modal>

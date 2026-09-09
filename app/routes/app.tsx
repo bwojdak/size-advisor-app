@@ -73,6 +73,9 @@ export default function App() {
           </a>
           <a href="/app/analytics">{translate(locale, "nav.analytics")}</a>
           <a href="/app/products">{translate(locale, "nav.products")}</a>
+          <a href="/app/sizing-systems">
+            {translate(locale, "nav.sizingSystems")}
+          </a>
           <a href="/app/plans">{translate(locale, "nav.plans")}</a>
           <a href="/app/settings">{translate(locale, "nav.settings")}</a>
         </NavMenu>

@@ -38,8 +38,40 @@ const messages: Record<Locale, Record<string, string>> = {
     "nav.panel": "Panel",
     "nav.analytics": "Analityka",
     "nav.products": "Produkty",
+    "nav.sizingSystems": "Systemy rozmiarów",
     "nav.plans": "Plan",
     "nav.settings": "Ustawienia",
+
+    "sizingSystems.title": "Systemy rozmiarów",
+    "sizingSystems.subtitle":
+      "Jedna rozmiarówka współdzielona przez wiele produktów — zdefiniuj raz, przypnij produkty jednym kliknięciem.",
+    "sizingSystems.new": "Nowy system",
+    "sizingSystems.newTitle": "Nowy system rozmiarów",
+    "sizingSystems.editTitle": "Edytuj system rozmiarów",
+    "sizingSystems.empty":
+      "Brak systemów. Utwórz np. „Standardowe t-shirty” i przypnij do niego wszystkie t-shirty naraz.",
+    "sizingSystems.edit": "Edytuj",
+    "sizingSystems.delete": "Usuń",
+    "sizingSystems.addProducts": "Przypnij produkty",
+    "sizingSystems.mappedCount": "Przypięte produkty: {n}",
+    "sizingSystems.mapped": "Przypięto {n} produktów",
+    "sizingSystems.confirmDelete":
+      "Usunąć system „{name}”? Odepnie się od {n} produktów (wrócą do własnej konfiguracji).",
+    "sizingSystems.nameLabel": "Nazwa systemu",
+    "sizingSystems.namePlaceholder": "np. Standardowe t-shirty",
+    "sizingSystems.chartLabel": "Tabela wymiarów (tekst)",
+    "sizingSystems.chartPlaceholder":
+      "Rozmiar S: klatka 114, długość 68\nRozmiar M: klatka 120, długość 70\n...",
+    "sizingSystems.chartHelp":
+      "Wklej wymiary w cm dla każdego rozmiaru. AI odczyta je raz przy zapisie i użyje dla wszystkich przypiętych produktów.",
+    "sizingSystems.notesLabel": "Notatki dla AI (opcjonalnie)",
+    "sizingSystems.notesPlaceholder":
+      "np. rozmiarówka zaniżona — brać większy rozmiar",
+    "sizingSystems.error.name": "Podaj nazwę systemu.",
+    "sizingSystems.error.dupe": "System o tej nazwie już istnieje.",
+    "sizingSystems.pickerLabel": "System rozmiarów",
+    "sizingSystems.pickerNone": "Własna tabela produktu",
+    "sizingSystems.usingSystem": "Używa systemu: {name}",
 
     "analytics.title": "Analityka",
     "analytics.subtitle": "Jak rekomendacje sprawdzają się w Twoim sklepie",
@@ -406,8 +438,39 @@ const messages: Record<Locale, Record<string, string>> = {
     "nav.panel": "Dashboard",
     "nav.analytics": "Analytics",
     "nav.products": "Products",
+    "nav.sizingSystems": "Sizing systems",
     "nav.plans": "Plan",
     "nav.settings": "Settings",
+
+    "sizingSystems.title": "Sizing systems",
+    "sizingSystems.subtitle":
+      "One size chart shared by many products — define it once, attach products in a click.",
+    "sizingSystems.new": "New system",
+    "sizingSystems.newTitle": "New sizing system",
+    "sizingSystems.editTitle": "Edit sizing system",
+    "sizingSystems.empty":
+      "No systems yet. Create e.g. \"Standard t-shirts\" and attach all your tees to it at once.",
+    "sizingSystems.edit": "Edit",
+    "sizingSystems.delete": "Delete",
+    "sizingSystems.addProducts": "Attach products",
+    "sizingSystems.mappedCount": "Attached products: {n}",
+    "sizingSystems.mapped": "Attached {n} products",
+    "sizingSystems.confirmDelete":
+      "Delete the \"{name}\" system? It will detach from {n} products (they go back to their own config).",
+    "sizingSystems.nameLabel": "System name",
+    "sizingSystems.namePlaceholder": "e.g. Standard t-shirts",
+    "sizingSystems.chartLabel": "Size chart (text)",
+    "sizingSystems.chartPlaceholder":
+      "Size S: chest 114, length 68\nSize M: chest 120, length 70\n...",
+    "sizingSystems.chartHelp":
+      "Paste per-size measurements in cm. The AI reads them once on save and uses them for every attached product.",
+    "sizingSystems.notesLabel": "Notes for the AI (optional)",
+    "sizingSystems.notesPlaceholder": "e.g. runs small — size up",
+    "sizingSystems.error.name": "Enter a system name.",
+    "sizingSystems.error.dupe": "A system with that name already exists.",
+    "sizingSystems.pickerLabel": "Sizing system",
+    "sizingSystems.pickerNone": "Product's own chart",
+    "sizingSystems.usingSystem": "Uses system: {name}",
 
     "analytics.title": "Analytics",
     "analytics.subtitle": "How recommendations are performing in your store",
