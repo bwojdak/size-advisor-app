@@ -65,12 +65,24 @@
 
         <div class="sa-grid-inputs">
           <div class="sa-input-col">
-            <label class="sa-label" for="user-height" data-i18n="height">{{ 'size_advisor.height' | t }}</label>
-            <input type="number" id="user-height" inputmode="numeric" data-i18n-ph="height_ph" placeholder="{{ 'size_advisor.height_ph' | t }}" min="140" max="215">
+            <div class="sa-field-head">
+              <label class="sa-label" for="user-height" data-i18n="height">{{ 'size_advisor.height' | t }}</label>
+              <div class="sa-unit-toggle" id="sa-height-unit" role="group" aria-label="cm / in">
+                <button type="button" data-unit="cm" aria-pressed="true">cm</button>
+                <button type="button" data-unit="in" aria-pressed="false">in</button>
+              </div>
+            </div>
+            <input type="number" id="user-height" inputmode="decimal" data-i18n-ph="height_ph" placeholder="{{ 'size_advisor.height_ph' | t }}" min="140" max="215">
           </div>
           <div class="sa-input-col">
-            <label class="sa-label" for="user-weight" data-i18n="weight">{{ 'size_advisor.weight' | t }}</label>
-            <input type="number" id="user-weight" inputmode="numeric" data-i18n-ph="weight_ph" placeholder="{{ 'size_advisor.weight_ph' | t }}" min="40" max="180">
+            <div class="sa-field-head">
+              <label class="sa-label" for="user-weight" data-i18n="weight">{{ 'size_advisor.weight' | t }}</label>
+              <div class="sa-unit-toggle" id="sa-weight-unit" role="group" aria-label="kg / lb">
+                <button type="button" data-unit="kg" aria-pressed="true">kg</button>
+                <button type="button" data-unit="lb" aria-pressed="false">lb</button>
+              </div>
+            </div>
+            <input type="number" id="user-weight" inputmode="decimal" data-i18n-ph="weight_ph" placeholder="{{ 'size_advisor.weight_ph' | t }}" min="40" max="180">
           </div>
         </div>
 
@@ -300,6 +312,38 @@
 
   .sa-grid-inputs { display: flex; gap: 12px; }
   .sa-input-col { flex: 1; }
+
+  .sa-field-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 14px 0 6px;
+  }
+  .sa-field-head .sa-label { margin: 0; }
+  .sa-unit-toggle {
+    display: inline-flex;
+    flex: none;
+    border: 1px solid var(--sa-border);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .sa-unit-toggle button {
+    border: 0;
+    background: #fff;
+    color: #6b7280;
+    font: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    line-height: 1.4;
+    cursor: pointer;
+    transition: background 0.14s ease, color 0.14s ease;
+  }
+  .sa-unit-toggle button + button { border-left: 1px solid var(--sa-border); }
+  .sa-unit-toggle button.active { background: var(--sa-accent); color: #fff; }
   .sa-input-col input {
     width: 100%;
     padding: 11px 12px;
@@ -413,6 +457,42 @@
     line-height: 1.5;
   }
   .sa-why-detail[hidden] { display: none; }
+
+  /* Skala dopasowania w wyniku: Ciaśniej ← Ty → Luźniej */
+  .sa-fit-scale { margin-top: 12px; }
+  .sa-fit-cells { display: flex; gap: 6px; }
+  .sa-fit-cell {
+    flex: 1;
+    text-align: center;
+    padding: 7px 4px;
+    border: 1px solid var(--sa-border);
+    border-radius: var(--sa-radius);
+    background: #fff;
+    line-height: 1.2;
+  }
+  .sa-fit-cell--you { background: var(--sa-accent); border-color: var(--sa-accent); }
+  .sa-fit-sz { display: block; font-size: 13px; font-weight: 700; color: #1f2430; }
+  .sa-fit-cell--you .sa-fit-sz { color: #fff; }
+  .sa-fit-tag {
+    display: block;
+    margin-top: 2px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.85);
+  }
+  .sa-fit-ends {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 5px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sa-muted);
+  }
+
   .sa-result--err {
     background: #fef2f2;
     border-left-color: #dc2626;
@@ -509,7 +589,12 @@
     go_to_cart: {{ 'size_advisor.go_to_cart' | t | json }},
     add_failed: {{ 'size_advisor.add_failed' | t | json }},
     out_of_stock: {{ 'size_advisor.out_of_stock' | t | json }},
-    pick_above: {{ 'size_advisor.pick_above' | t | json }}
+    pick_above: {{ 'size_advisor.pick_above' | t | json }},
+    height_ph_in: {{ 'size_advisor.height_ph_in' | t | json }},
+    weight_ph_lb: {{ 'size_advisor.weight_ph_lb' | t | json }},
+    fit_tighter: {{ 'size_advisor.fit_tighter' | t | json }},
+    fit_looser: {{ 'size_advisor.fit_looser' | t | json }},
+    fit_you: {{ 'size_advisor.fit_you' | t | json }}
   };
   window.__SA_LOCALE = {{ localization.language.iso_code | json }};
 
@@ -524,10 +609,12 @@
       gender: "Płeć",
       gender_male: "Mężczyzna",
       gender_female: "Kobieta",
-      height: "Wzrost (cm)",
+      height: "Wzrost",
       height_ph: "np. 182",
-      weight: "Waga (kg)",
+      height_ph_in: "np. 72",
+      weight: "Waga",
       weight_ph: "np. 78",
+      weight_ph_lb: "np. 165",
       body: "Budowa ciała",
       body_slim: "Szczupła",
       body_standard: "Standardowa",
@@ -537,6 +624,9 @@
       fit_fitted: "Dopasowany",
       fit_regular: "Klasyczny",
       fit_loose: "Luźny",
+      fit_tighter: "Ciaśniej",
+      fit_looser: "Luźniej",
+      fit_you: "Ty",
       garment_toggle: "Mam ubranie tego typu, które leży idealnie",
       garment_brand: "Marka",
       garment_brand_ph: "Marka",
@@ -545,8 +635,8 @@
       garment_hint: "Dobierzemy rozmiar tak, żeby leżał podobnie.",
       calc: "Oblicz rozmiar",
       calc_loading: "Analizuję sylwetkę…",
-      err_height: "Podaj poprawny wzrost (140–215 cm).",
-      err_weight: "Podaj poprawną wagę (40–180 kg).",
+      err_height: "Podaj poprawny wzrost ([range]).",
+      err_weight: "Podaj poprawną wagę ([range]).",
       err_connection: "Błąd połączenia z serwerem.",
       result_size: "Rekomendowany rozmiar: [size]",
       cart_best: "Twój najlepszy rozmiar: [size]",
@@ -568,10 +658,12 @@
       gender: "Gender",
       gender_male: "Men",
       gender_female: "Women",
-      height: "Height (cm)",
+      height: "Height",
       height_ph: "e.g. 182",
-      weight: "Weight (kg)",
+      height_ph_in: "e.g. 72",
+      weight: "Weight",
       weight_ph: "e.g. 78",
+      weight_ph_lb: "e.g. 165",
       body: "Body type",
       body_slim: "Slim",
       body_standard: "Standard",
@@ -581,6 +673,9 @@
       fit_fitted: "Fitted",
       fit_regular: "Regular",
       fit_loose: "Loose",
+      fit_tighter: "Tighter",
+      fit_looser: "Looser",
+      fit_you: "You",
       garment_toggle: "I have a garment of this type that fits perfectly",
       garment_brand: "Brand",
       garment_brand_ph: "Brand",
@@ -589,8 +684,8 @@
       garment_hint: "We'll pick a size that fits like that one.",
       calc: "Calculate size",
       calc_loading: "Analyzing your build…",
-      err_height: "Enter a valid height (140–215 cm).",
-      err_weight: "Enter a valid weight (40–180 kg).",
+      err_height: "Enter a valid height ([range]).",
+      err_weight: "Enter a valid weight ([range]).",
       err_connection: "Server connection error.",
       result_size: "Recommended size: [size]",
       cart_best: "Your best size: [size]",
@@ -632,6 +727,19 @@
     })();
     let saLang = saStoreLang;
 
+    // Tłumaczenie z fallbackiem: aktywna tabela → pełny zestaw dla języka →
+    // literał. Pomija „translation missing" ze starych motywów bez nowych kluczy.
+    const t = (key, fallback) => {
+      const v = I18N[key];
+      if (v != null && !/^translation missing/i.test(v)) return v;
+      const tbl = SA_ALL[saLang];
+      if (tbl && tbl[key] != null) return tbl[key];
+      return fallback;
+    };
+    // Prawdziwa implementacja podstawiana w initSizeAdvisor, gdy DOM już jest.
+    // Zadeklarowane tu, bo applyI18n() woła to przy przełączeniu języka.
+    let applyUnits = function () {};
+
     function applyI18n(lang) {
       const tbl = SA_ALL[lang];
       if (!tbl) return;
@@ -651,6 +759,8 @@
         if (v != null) el.setAttribute('aria-label', v);
       });
       try { localStorage.setItem('sa-lang', lang); } catch (e) {}
+      // Etykiety wzrostu/wagi mają dopisaną jednostkę — odtwórz po podmianie i18n.
+      applyUnits();
     }
 
     let allowAddToCart = false;
@@ -770,6 +880,33 @@
       resultDiv.hidden = false;
       resultDiv.className = 'sa-result' + (state ? ' sa-result--' + state : '');
       resultDiv.innerHTML = html;
+    }
+
+    // Skala „Ciaśniej ← Ty → Luźniej" z sąsiadującymi rozmiarami zwróconymi
+    // przez /recommend. Czysty render — chowa się, gdy nie ma żadnego sąsiada.
+    function fitScaleHtml(data) {
+      const sm = data && data.neighborSmaller;
+      const lg = data && data.neighborLarger;
+      const mid = data && data.size;
+      if (!sm && !lg) return '';
+      const cell = (label, you) =>
+        '<div class="sa-fit-cell' + (you ? ' sa-fit-cell--you' : '') + '">' +
+          '<span class="sa-fit-sz">' + esc(label) + '</span>' +
+          (you ? '<span class="sa-fit-tag">' + esc(t('fit_you', 'Ty')) + '</span>' : '') +
+        '</div>';
+      let cells = '';
+      if (sm) cells += cell(sm, false);
+      cells += cell(mid, true);
+      if (lg) cells += cell(lg, false);
+      return (
+        '<div class="sa-fit-scale">' +
+          '<div class="sa-fit-cells">' + cells + '</div>' +
+          '<div class="sa-fit-ends">' +
+            '<span>&larr; ' + esc(t('fit_tighter', 'Ciaśniej')) + '</span>' +
+            '<span>' + esc(t('fit_looser', 'Luźniej')) + ' &rarr;</span>' +
+          '</div>' +
+        '</div>'
+      );
     }
 
     function findVariantForSize(size) {
@@ -895,21 +1032,92 @@
     setupPillGroup('sa-body-group');
     setupPillGroup('sa-fit-group');
 
+    // --- Jednostki: CM/IN + kg/lb. Kontrakt serwera zostaje metryczny —
+    // konwertujemy tuż przed wysłaniem. Wybór trzymamy w localStorage
+    // niezależnie dla wzrostu i wagi (np. "cm/lb").
+    const IN_PER_CM = 2.54;
+    const LB_PER_KG = 0.45359237;
+    let hUnit = 'cm';
+    let wUnit = 'kg';
+    try {
+      const saved = String(localStorage.getItem('sa-units') || '').split('/');
+      if (saved[0] === 'cm' || saved[0] === 'in') hUnit = saved[0];
+      if (saved[1] === 'kg' || saved[1] === 'lb') wUnit = saved[1];
+    } catch (e) {}
+
+    function setUnitToggle(groupId, unit) {
+      const g = document.getElementById(groupId);
+      if (!g) return;
+      g.querySelectorAll('button').forEach((b) => {
+        const on = b.dataset.unit === unit;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+
+    applyUnits = function () {
+      const hIn = hUnit === 'in';
+      const wLb = wUnit === 'lb';
+      const scope = saRoot || document;
+      const hLabel = scope.querySelector('label[for="user-height"]');
+      const wLabel = scope.querySelector('label[for="user-weight"]');
+      const hEl = document.getElementById('user-height');
+      const wEl = document.getElementById('user-weight');
+      if (hLabel) hLabel.textContent = t('height', 'Wzrost') + ' (' + hUnit + ')';
+      if (wLabel) wLabel.textContent = t('weight', 'Waga') + ' (' + wUnit + ')';
+      if (hEl) {
+        hEl.min = hIn ? 55 : 140;
+        hEl.max = hIn ? 85 : 215;
+        hEl.placeholder = hIn ? t('height_ph_in', 'np. 72') : t('height_ph', 'np. 182');
+      }
+      if (wEl) {
+        wEl.min = wLb ? 88 : 40;
+        wEl.max = wLb ? 397 : 180;
+        wEl.placeholder = wLb ? t('weight_ph_lb', 'np. 165') : t('weight_ph', 'np. 78');
+      }
+      setUnitToggle('sa-height-unit', hUnit);
+      setUnitToggle('sa-weight-unit', wUnit);
+    };
+
+    function wireUnitToggle(groupId, which) {
+      const g = document.getElementById(groupId);
+      if (!g) return;
+      g.querySelectorAll('button').forEach((b) => {
+        b.addEventListener('click', () => {
+          const u = b.dataset.unit;
+          if (which === 'h') hUnit = u; else wUnit = u;
+          try { localStorage.setItem('sa-units', hUnit + '/' + wUnit); } catch (e) {}
+          applyUnits();
+        });
+      });
+    }
+    wireUnitToggle('sa-height-unit', 'h');
+    wireUnitToggle('sa-weight-unit', 'w');
+    applyUnits();
+
+    const rangeLabel = (metric) =>
+      metric === 'height'
+        ? (hUnit === 'in' ? '55–85 in' : '140–215 cm')
+        : (wUnit === 'lb' ? '88–397 lb' : '40–180 kg');
+
     if (calcBtn) {
       calcBtn.addEventListener('click', async () => {
         if (calcBtn.dataset.loading === '1') return;
 
-        const height = Number(document.getElementById('user-height').value);
-        const weight = Number(document.getElementById('user-weight').value);
+        const rawHeight = Number(document.getElementById('user-height').value);
+        const rawWeight = Number(document.getElementById('user-weight').value);
+        // Serwer i silnik oczekują cm/kg — konwersja i zaokrąglenie tutaj.
+        const height = Math.round(hUnit === 'in' ? rawHeight * IN_PER_CM : rawHeight);
+        const weight = Math.round(wUnit === 'lb' ? rawWeight * LB_PER_KG : rawWeight);
         const gender = document.querySelector('#sa-gender-group .sa-pill-btn.active')?.dataset.value || 'male';
         const bodyType = document.querySelector('#sa-body-group .sa-pill-btn.active')?.dataset.value || 'standard';
 
         if (!height || height < 140 || height > 215) {
-          setResult('err', I18N.err_height);
+          setResult('err', String(I18N.err_height).replace('[range]', rangeLabel('height')));
           return;
         }
         if (!weight || weight < 40 || weight > 180) {
-          setResult('err', I18N.err_weight);
+          setResult('err', String(I18N.err_weight).replace('[range]', rangeLabel('weight')));
           return;
         }
 
@@ -975,6 +1183,7 @@
                 esc(I18N.why || 'Why this size?') + '</button>' +
                 '<span class="sa-why-detail" hidden>' + esc(detail) + '</span>';
             }
+            html += fitScaleHtml(data);
             setResult('ok', html);
             if (hasDetail) {
               const tg = resultDiv.querySelector('.sa-why-toggle');

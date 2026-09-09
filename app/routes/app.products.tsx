@@ -261,6 +261,10 @@ export default function ProductsConfig() {
     () => new Map(rules.map((r) => [r.productId, r])),
     [rules],
   );
+  const systemNameById = useMemo(
+    () => new Map(sizingSystems.map((s) => [s.id, s.name])),
+    [sizingSystems],
+  );
 
   const [search, setSearch] = useState("");
   const titleOf = useCallback(
@@ -554,6 +558,14 @@ export default function ProductsConfig() {
                           {title}
                         </Text>
                         <InlineStack gap="150">
+                          {rule.sizingSystemId ? (
+                            <Badge tone="info">
+                              {t("products.badge.system", {
+                                name:
+                                  systemNameById.get(rule.sizingSystemId) ?? "",
+                              })}
+                            </Badge>
+                          ) : null}
                           {rule.customNotes ? (
                             <Badge tone="info">{t("products.badge.notes")}</Badge>
                           ) : null}
@@ -563,7 +575,8 @@ export default function ProductsConfig() {
                           {rule.sizeChartImage ? (
                             <Badge tone="info">{t("products.badge.image")}</Badge>
                           ) : null}
-                          {!rule.customNotes &&
+                          {!rule.sizingSystemId &&
+                          !rule.customNotes &&
                           !rule.parsedSizeData &&
                           !rule.sizeChartImage ? (
                             <Badge>{t("products.badge.empty")}</Badge>

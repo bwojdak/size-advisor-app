@@ -25,12 +25,14 @@ import {
 } from "../lib/size-advisor.server";
 
 type Summary = ReturnType<typeof describeExtraction>;
+type AttachedProduct = { id: string; title: string };
 type SystemView = {
   id: string;
   name: string;
   parsedSizeData: string;
   customNotes: string;
   mapped: number;
+  products: AttachedProduct[];
   extraction:
     | { state: "ok"; summary: Summary }
     | { state: "error" }
@@ -45,14 +47,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     where: { shopId: settings.id },
     orderBy: { updatedAt: "desc" },
   });
-  const counts = await db.productRule.groupBy({
-    by: ["sizingSystemId"],
+  const mappedRules = await db.productRule.findMany({
     where: { shopId: settings.id, sizingSystemId: { not: null } },
-    _count: { _all: true },
+    select: { productId: true, productTitle: true, sizingSystemId: true },
+    orderBy: { productTitle: "asc" },
   });
-  const countBy = new Map(
-    counts.map((c) => [c.sizingSystemId as string, c._count._all]),
-  );
+  const productsBySystem = new Map<string, AttachedProduct[]>();
+  for (const r of mappedRules) {
+    const key = r.sizingSystemId as string;
+    const arr = productsBySystem.get(key) ?? [];
+    arr.push({ id: r.productId, title: r.productTitle ?? "" });
+    productsBySystem.set(key, arr);
+  }
 
   const views: SystemView[] = systems.map((s) => {
     let extraction: SystemView["extraction"] = { state: "pending" };
@@ -67,12 +73,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         extraction = { state: "ok", summary: describeExtraction(parsed) };
       }
     }
+    const attached = productsBySystem.get(s.id) ?? [];
     return {
       id: s.id,
       name: s.name,
       parsedSizeData: s.parsedSizeData ?? "",
       customNotes: s.customNotes ?? "",
-      mapped: countBy.get(s.id) ?? 0,
+      mapped: attached.length,
+      products: attached,
       extraction,
     };
   });
@@ -381,6 +389,41 @@ export default function SizingSystemsPage() {
                       borderRadius="200"
                     >
                       <ExtractionSummary view={s} />
+                    </Box>
+                    <Box
+                      padding="300"
+                      background="bg-surface-secondary"
+                      borderRadius="200"
+                    >
+                      <BlockStack gap="150">
+                        <Text as="span" variant="bodySm" fontWeight="medium">
+                          {t("sizingSystems.attachedList")}
+                        </Text>
+                        {s.products.length === 0 ? (
+                          <Text as="span" variant="bodySm" tone="subdued">
+                            {t("sizingSystems.noneAttached")}
+                          </Text>
+                        ) : (
+                          <InlineStack gap="150" wrap>
+                            {s.products.slice(0, 12).map((p) => (
+                              <Badge key={p.id}>
+                                {p.title || `#${p.id}`}
+                              </Badge>
+                            ))}
+                            {s.products.length > 12 ? (
+                              <Text
+                                as="span"
+                                variant="bodySm"
+                                tone="subdued"
+                              >
+                                {t("sizingSystems.moreAttached", {
+                                  n: s.products.length - 12,
+                                })}
+                              </Text>
+                            ) : null}
+                          </InlineStack>
+                        )}
+                      </BlockStack>
                     </Box>
                   </BlockStack>
                 </Card>
