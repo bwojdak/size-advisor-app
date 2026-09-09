@@ -25,7 +25,14 @@ const CACHE_MAX = 500;
 const ANALYSIS_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const recommendationCache = new Map<
   string,
-  { size: string; explanation: string; detail: string; ts: number }
+  {
+    size: string;
+    explanation: string;
+    detail: string;
+    nbSmaller: string | null;
+    nbLarger: string | null;
+    ts: number;
+  }
 >();
 
 function getCachedRecommendation(key: string) {
@@ -43,12 +50,21 @@ function setCachedRecommendation(
   size: string,
   explanation: string,
   detail: string,
+  nbSmaller: string | null,
+  nbLarger: string | null,
 ) {
   if (recommendationCache.size >= CACHE_MAX) {
     const oldest = recommendationCache.keys().next().value;
     if (oldest !== undefined) recommendationCache.delete(oldest);
   }
-  recommendationCache.set(key, { size, explanation, detail, ts: Date.now() });
+  recommendationCache.set(key, {
+    size,
+    explanation,
+    detail,
+    nbSmaller,
+    nbLarger,
+    ts: Date.now(),
+  });
 }
 
 // --- Ochrona przed spamem: limit zapytań per sklep+IP (in-memory, best-effort).
@@ -281,6 +297,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     let finalSize: string;
     let finalExplanation: string;
     let finalDetail: string;
+    let finalNbSmaller: string | null = null;
+    let finalNbLarger: string | null = null;
 
     const decision = {
       height,
@@ -298,6 +316,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalSize = cached.size;
       finalExplanation = cached.explanation;
       finalDetail = cached.detail;
+      finalNbSmaller = cached.nbSmaller;
+      finalNbLarger = cached.nbLarger;
     } else if (
       // Gotowa analiza produktu z konfiguracji → decyzja bez wołania AI.
       // Pomijamy, gdy klient podał ubranie referencyjne (potrzebny świeży
@@ -312,7 +332,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalSize = decided.size;
       finalExplanation = decided.explanation;
       finalDetail = decided.explanationDetail;
-      setCachedRecommendation(cacheKey, finalSize, finalExplanation, finalDetail);
+      finalNbSmaller = decided.neighborSmaller;
+      finalNbLarger = decided.neighborLarger;
+      setCachedRecommendation(
+        cacheKey,
+        finalSize,
+        finalExplanation,
+        finalDetail,
+        finalNbSmaller,
+        finalNbLarger,
+      );
     } else if (
       // Cache analizy produktu niekonfigurowanego → decyzja bez wołania AI.
       !referenceGarment &&
@@ -326,7 +355,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalSize = decided.size;
       finalExplanation = decided.explanation;
       finalDetail = decided.explanationDetail;
-      setCachedRecommendation(cacheKey, finalSize, finalExplanation, finalDetail);
+      finalNbSmaller = decided.neighborSmaller;
+      finalNbLarger = decided.neighborLarger;
+      setCachedRecommendation(
+        cacheKey,
+        finalSize,
+        finalExplanation,
+        finalDetail,
+        finalNbSmaller,
+        finalNbLarger,
+      );
     } else {
       // Zdjęcie rozmiarówki tylko w planach z multimodalnym AI i tylko dla
       // produktu z własną tabelą (system rozmiarów jest tekstowy).
@@ -393,7 +431,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalSize = result.size;
       finalExplanation = result.explanation;
       finalDetail = result.explanationDetail;
-      setCachedRecommendation(cacheKey, finalSize, finalExplanation, finalDetail);
+      finalNbSmaller = result.neighborSmaller;
+      finalNbLarger = result.neighborLarger;
+      setCachedRecommendation(
+        cacheKey,
+        finalSize,
+        finalExplanation,
+        finalDetail,
+        finalNbSmaller,
+        finalNbLarger,
+      );
 
       // Zapisz świeżą analizę produktu, żeby kolejne zapytania (tego i innych
       // klientów) nie wołały już modelu. Nie zapisujemy, gdy w prompt weszło
@@ -475,6 +522,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       size: finalSize,
       explanation: finalExplanation,
       explanationDetail: finalDetail,
+      neighborSmaller: finalNbSmaller,
+      neighborLarger: finalNbLarger,
     });
   } catch (error) {
     console.error("Endpoint Handler Error:", error);

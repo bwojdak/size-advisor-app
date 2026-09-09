@@ -395,7 +395,25 @@ export type ResolveResult = {
   modelRef: { height: number; size: string } | null;
   /** ustawione, gdy rozmiar wyszedł z porównania do ubrania referencyjnego. */
   matchedReference: { brand: string; size: string } | null;
+  /** Sąsiednie rozmiary z tabeli — do suwaka „ciaśniej ← Ty → luźniej". */
+  neighborSmaller: string | null;
+  neighborLarger: string | null;
 };
+
+const normSize = (s: string) => s.toUpperCase().replace(/\s+/g, "");
+
+/** Etykiety rozmiarów tuż obok wybranego (do suwaka w widżecie). */
+function neighborLabels(
+  rows: NormalizedSizeRow[],
+  chosenSize: string,
+): { neighborSmaller: string | null; neighborLarger: string | null } {
+  const i = rows.findIndex((r) => normSize(r.size) === normSize(chosenSize));
+  return {
+    neighborSmaller: i > 0 ? normSize(rows[i - 1].size) : null,
+    neighborLarger:
+      i >= 0 && i < rows.length - 1 ? normSize(rows[i + 1].size) : null,
+  };
+}
 
 // Sito na oczywisty bełkot w nazwie marki podanej przez klienta (losowy ciąg
 // znaków typu „sdfsdfsdgfaf"). To NIE jest walidacja „czy marka istnieje" —
@@ -613,6 +631,7 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
         anchoredToModel: false,
         modelRef: null,
         matchedReference: input.referenceGarment,
+        ...neighborLabels(rows, chosen.size),
       };
     }
   }
@@ -893,6 +912,7 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
         ? { height: extraction.modelHeight, size: extraction.modelSize }
         : null,
     matchedReference: null,
+    ...neighborLabels(rows, chosen.size),
   };
 }
 
@@ -1098,6 +1118,9 @@ export type AICallResult = {
   explanationDetail: string;
   /** "chart" = rozmiar policzony z tabeli; "estimate" = model zgadł (brak tabeli). */
   source: "chart" | "estimate";
+  /** Sąsiednie rozmiary — do suwaka „ciaśniej ← Ty → luźniej" w widżecie. */
+  neighborSmaller: string | null;
+  neighborLarger: string | null;
   attachedImage: boolean;
   promptTokenCount: number | null;
   candidatesTokenCount: number | null;
@@ -1244,6 +1267,8 @@ export function decideSize(
       explanation: headline,
       explanationDetail: detail,
       source: "chart",
+      neighborSmaller: resolved.neighborSmaller,
+      neighborLarger: resolved.neighborLarger,
     };
   }
 
@@ -1267,6 +1292,17 @@ export function decideSize(
     if (si < 0) si = CANON_SIZES.indexOf("M");
     size = CANON_SIZES[clamp(si, lo, hi)];
   }
+  // Sąsiedzi po kanonicznej drabinie, przycięci do zakresu etykiet z tabeli.
+  const rangeLo = labelIdxs.length >= 2 ? Math.min(...labelIdxs) : 0;
+  const rangeHi =
+    labelIdxs.length >= 2 ? Math.max(...labelIdxs) : CANON_SIZES.length - 1;
+  const sIdx = CANON_SIZES.indexOf(size);
+  const estSmaller =
+    sIdx > rangeLo && sIdx > 0 ? CANON_SIZES[sIdx - 1] : null;
+  const estLarger =
+    sIdx >= 0 && sIdx < rangeHi && sIdx < CANON_SIZES.length - 1
+      ? CANON_SIZES[sIdx + 1]
+      : null;
   const isPl = (d.locale || "pl").toLowerCase().slice(0, 2) === "pl";
   const headline = isPl
     ? `Rozmiar ${size} — oszacowany na podstawie Twoich wymiarów.`
@@ -1279,6 +1315,8 @@ export function decideSize(
     explanation: headline,
     explanationDetail: height > 0 ? detail : headline,
     source: "estimate",
+    neighborSmaller: estSmaller,
+    neighborLarger: estLarger,
   };
 }
 
