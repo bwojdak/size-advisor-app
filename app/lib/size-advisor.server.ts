@@ -236,10 +236,7 @@ function estimateLetterSize(
 ): string {
   const chest = estimateChest(h, w, gender, build);
   // Górna granica pasma → etykieta (pełny obwód w cm).
-  const bands: Array<[number, string]> =
-    gender === "female"
-      ? [[82, "XS"], [88, "S"], [94, "M"], [100, "L"], [108, "XL"], [116, "XXL"]]
-      : [[86, "XS"], [94, "S"], [102, "M"], [110, "L"], [118, "XL"], [128, "XXL"]];
+  const bands = chestBands(gender);
   let label = "XXL";
   for (const [hi, s] of bands) {
     if (chest < hi) {
@@ -264,6 +261,35 @@ function estimateLetterSize(
   if (fit === "loose") idx += 1;
   idx = clamp(idx, CANON_SIZES.indexOf("XS"), CANON_SIZES.indexOf("XXL"));
   return CANON_SIZES[idx];
+}
+
+/** Te same pasma klatki co w `estimateLetterSize` — wspólne źródło. */
+function chestBands(gender: string): Array<[number, string]> {
+  return gender === "female"
+    ? [[82, "XS"], [88, "S"], [94, "M"], [100, "L"], [108, "XL"], [116, "XXL"]]
+    : [[86, "XS"], [94, "S"], [102, "M"], [110, "L"], [118, "XL"], [128, "XXL"]];
+}
+
+/** Pozycja obwodu klatki w OBRĘBIE pasma danego rozmiaru → [-1, 1] dla pinezki
+ *  na suwaku, gdy rozmiar wyszedł z oszacowania (produkt bez tabeli). Ujemne =
+ *  przy dolnej granicy (ku mniejszemu), dodatnie = przy górnej (ku większemu).
+ *  null, gdy etykieta jest spoza pasm (rozmiary liczbowe, XXS, 3XL+). */
+function estimateFitOffset(
+  chest: number,
+  gender: string,
+  label: string,
+): number | null {
+  const bands = chestBands(gender);
+  const i = bands.findIndex(([, s]) => s === label);
+  if (i < 0) return null;
+  const hiEdge = bands[i][0];
+  const loEdge =
+    i > 0
+      ? bands[i - 1][0]
+      : hiEdge - (bands[i + 1] ? bands[i + 1][0] - hiEdge : 8);
+  if (!(hiEdge > loEdge)) return null;
+  const p = (chest - loEdge) / (hiEdge - loEdge); // 0..1 w paśmie
+  return clamp(p * 2 - 1, -1, 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -1363,7 +1389,16 @@ export function decideSize(
     source: "estimate",
     neighborSmaller: estSmaller,
     neighborLarger: estLarger,
-    fitOffset: null,
+    // Bez tabeli: pozycja pinezki z pasma obwodu klatki (zmienia się ze wzrostem
+    // i wagą). null tylko gdy brak wzrostu albo rozmiar spoza pasm literowych.
+    fitOffset:
+      height > 0
+        ? estimateFitOffset(
+            estimateChest(height, weight, gender, bodyType),
+            gender,
+            size,
+          )
+        : null,
   };
 }
 
