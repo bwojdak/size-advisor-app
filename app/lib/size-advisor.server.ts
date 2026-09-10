@@ -374,7 +374,7 @@ ZASADY:
 - "tabela": przepisz KAŻDY rozmiar i KAŻDY wymiar z tabeli/zdjęcia/opisu. Obwody podawaj jako PEŁNE w cm – jeśli tabela podaje połowę ("Pacha", "1/2 klatki", "szerokość", "A", "½"), pomnóż przez 2. Brak wymiaru = null. Nie zgaduj wartości, których nie ma.
 - Jeśli NIE MA żadnych wymiarów (ani zdjęcia, ani tabeli, ani liczb w opisie): "tabela": [], a Ty sam oszacuj "zapasowyRozmiar" (XS–XXL) i krótkie "zapasoweUzasadnienie" (max 2 zdania, w języku ${langHint}) – jeśli wytyczne marki każą schodzić/podnosić rozmiar, uwzględnij to i wspomnij o tym. W przeciwnym razie zostaw je jako null / "".
 - "kategoria": "dol" = spodnie, jeansy, dresy, szorty, spódnica. "gora" = t-shirt, koszula, bluza, hoodie, sweter, kurtka. "sukienka" = sukienka, kombinezon.
-- "krojLuz": oceń z nazwy, opisu, wytycznych marki ORAZ z samych wymiarów (obwód ubrania vs obwód klienta): "obcisly" (slim/skinny), "regularny", "swobodny" (relaxed/loose/baggy/szerokie), "oversize" (boxy, drop shoulder, bardzo szerokie).
+- "krojLuz": oceń PRZEDE WSZYSTKIM z wymiarów tabeli, nie z nazwy. Porównaj PEŁNY obwód klatki najmniejszego rozmiaru z typowym ciałem dla tej litery (mężczyzna: S≈94, M≈102, L≈110, XL≈118 cm; kobieta ~8 cm mniej) oraz proporcję obwód:długość. Zapas ≥15 cm nad ciałem przy najmniejszym rozmiarze lub szeroki i krótki krój (obwód:długość ≥ 1.6) = "oversize", NAWET gdy nazwa mówi „klasyczny/regular". Nazwa i opis to tylko słaba wskazówka. Wartości: "obcisly" (ubranie ciaśniejsze/równe ciału), "regularny" (~6–12 cm zapasu), "swobodny" (relaxed/loose/baggy, ~13–20 cm), "oversize" (boxy, drop shoulder, ≥20 cm lub bardzo szeroki krój).
 - "obwod...Klienta": oszacuj z płci, wzrostu, wagi, budowy. Podaj liczby, nie null.
 - "korektaRozmiaru": -1 jeśli marka/uwagi każą "brać mniejszy / rozmiarówka zawyżona / size down"; +1 przy "brać większy / zawężona"; inaczej 0.
 - "dzianina": true jeśli materiał jest rozciągliwy (dzianina, jersey, elastan/spandex/lycra, modal, prążek, sweter). false dla tkaniny (denim/jeans, popelina, twill, gabardyna, len, płótno, "woven").
@@ -745,12 +745,42 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
     ? Math.min(...usable.map((r) => primaryOf(r) as number))
     : Infinity;
 
+  // „Strukturalnie boxy" — ocena z SAMYCH wymiarów tabeli, niezależnie od nazwy
+  // produktu / systemu i od tego, co AI wpisało w `krojLuz`. Najmniejszy rozmiar
+  // ma dużo więcej obwodu niż typowe ciało dla tej litery (≥15 cm zapasu) ORAZ
+  // krój jest szeroki i krótki (obwód:długość ≥ 1.6). Wtedy o rozmiarze decyduje
+  // długość vs wzrost, nie obwód — inaczej wysoka szczupła sylwetka dostaje za
+  // mały rozmiar (klatka „pasuje", ale koszulka jest za krótka).
+  const structurallyBoxy = (() => {
+    if (
+      category !== "top" ||
+      useWaist ||
+      lengthDimFn == null ||
+      usable.length < 2
+    ) {
+      return false;
+    }
+    const bySize = [...usable].sort(
+      (a, b) => (primaryOf(a) as number) - (primaryOf(b) as number),
+    );
+    const smallest = bySize[0];
+    const chestS = primaryOf(smallest) as number;
+    const lenS = lengthDimFn(smallest);
+    if (!(chestS > 0) || !(lenS > 0)) return false;
+    const band = chestBands(gender).find(
+      ([, s]) => s === normSize(smallest.size),
+    );
+    if (!band) return false; // rozmiary liczbowe → zostaw istniejącą logikę
+    return chestS - band[0] >= 15 && chestS / lenS >= 1.6;
+  })();
+
   // Tryb „po długości" tylko dla GÓRY (nie sukienek – te zawsze po biuście,
   // długość to styl mini/midi, nie rozmiar). „Ukryty oversize" gdy najmniejszy
-  // rozmiar jest ~2 rozmiary szerszy niż sylwetka.
+  // rozmiar jest ~2 rozmiary szerszy niż sylwetka albo tabela jest strukturalnie boxy.
   const topProportional =
     category === "top" &&
     (cut === "oversize" ||
+      structurallyBoxy ||
       (usable.length >= 2 && smallestPrimary > bodyPrimary + 18)) &&
     lengthDimFn != null;
   // Dół z pasem na gumce gradujemy po DŁUGOŚCI nogawki tylko wtedy, gdy nogawka
