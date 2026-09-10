@@ -498,13 +498,20 @@ function scaleFrom(
   const shown = pts.slice(start, start + size);
   const n = shown.length;
 
-  const pos = clamp((gIdx - start + 0.5) / n, 0.03, 0.97);
-
   let recIndex = shown.findIndex((x) => x.label === normSize(recLabel));
   if (recIndex < 0) {
     const recAll = pts.findIndex((x) => x.label === normSize(recLabel));
     recIndex = recAll >= 0 && recAll < start ? 0 : n - 1;
   }
+
+  // Pinezka może stać blisko krawędzi rekomendowanej komórki, ale NIE wchodzić
+  // w komórkę innego rozmiaru — inaczej „pasek na L, a napis M" wygląda na błąd.
+  const pos = clamp(
+    (gIdx - start + 0.5) / n,
+    (recIndex + 0.12) / n,
+    (recIndex + 0.88) / n,
+  );
+
   return { labels: shown.map((x) => x.label), pos, recIndex };
 }
 
