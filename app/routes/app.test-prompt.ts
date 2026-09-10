@@ -38,8 +38,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     gender?: string;
     bodyType?: string;
     fitPreference?: string;
-    refBrand?: string;
-    refSize?: string;
+    refMeasurements?: Record<string, unknown>;
     productId?: string;
   };
 
@@ -49,10 +48,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     body.fitPreference === "fitted" || body.fitPreference === "loose"
       ? body.fitPreference
       : null;
-  const refBrandS = String(body.refBrand ?? "").trim().slice(0, 40);
-  const refSizeS = String(body.refSize ?? "").trim().slice(0, 16);
-  const referenceGarment =
-    refBrandS && refSizeS ? { brand: refBrandS, size: refSizeS } : null;
+  // Ubranie referencyjne w testerze: pola wymiarów (na płasko, cm).
+  const referenceGarment = (() => {
+    const src =
+      body.refMeasurements && typeof body.refMeasurements === "object"
+        ? (body.refMeasurements as Record<string, unknown>)
+        : {};
+    const m: {
+      chest?: number;
+      waist?: number;
+      hip?: number;
+      length?: number;
+      inseam?: number;
+    } = {};
+    for (const k of ["chest", "waist", "hip", "length", "inseam"] as const) {
+      const n = Number(src[k]);
+      if (Number.isFinite(n) && n >= 15 && n <= 150) m[k] = Math.round(n);
+    }
+    return Object.keys(m).length ? { measurements: m } : null;
+  })();
   if (!height || !weight) {
     return Response.json({ error: t("error.missingHeightWeight") }, { status: 400 });
   }
@@ -124,7 +138,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     productNotes: chartNotes,
     hasSizeChartImage: useImage,
     fitPreference: fit,
-    referenceGarment,
     responseLanguage: adminLocale,
   });
 

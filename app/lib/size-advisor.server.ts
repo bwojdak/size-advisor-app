@@ -96,8 +96,6 @@ type PromptInput = {
   productNotes?: string | null;
   hasSizeChartImage?: boolean;
   fitPreference?: FitPreference;
-  /** „Mam dobrze leżące Nike M" — mocna kotwica obwodu ciała. */
-  referenceGarment?: { brand?: string | null; size?: string | null } | null;
   /** ISO 639-1 kod, w którym ma być zapasowe uzasadnienie modelu. */
   responseLanguage?: string | null;
   /** true → prompt tylko o produkcie (bez sylwetki klienta) — używany do
@@ -341,23 +339,15 @@ export function buildSizeAdvisorPrompt(input: PromptInput): string {
       } (to rozstrzyga program, nie Ty).\n`
     : "";
 
-  const ref = input.referenceGarment;
-  const refBrand = ref?.brand?.trim();
-  const refSize = ref?.size?.trim();
-  const refLine =
-    refBrand && refSize
-      ? `\nUBRANIE REFERENCYJNE: klient mówi, że „${refBrand}" w rozmiarze „${refSize}" (podobny typ jak ten produkt) leży na nim IDEALNIE. Jeśli „${refBrand}" to marka rozpoznawalna, o w miarę spójnej rozmiarówce (np. Zara, H&M, Nike, Uniqlo, Reserved, COS, Mango, Levi's, Adidas, Massimo Dutti i podobne sieciówki), porównaj UBRANIE DO UBRANIA (nie licz obwodu ciała) i wpisz w "refRozmiarWTabeli" ten rozmiar z "tabela", który leżałby najbardziej podobnie.\nWpisz null TYLKO jeśli: marka jest naprawdę nieznana / czysto lokalna / handmade, albo nazwa lub rozmiar to wygląda na przypadkowy ciąg znaków ("${refBrand}" / "${refSize}"). Nie zgaduj rozmiaru „na oko" z samego wzrostu/wagi — od tego jest program.\n`
-      : "";
-
   const langCode = (input.responseLanguage || "pl").toLowerCase().slice(0, 2);
   const langHint = LANGUAGE_HINTS[langCode] || `o kodzie ISO 639-1 "${langCode}"`;
 
   const shopperBlock = input.omitShopper
-    ? "\n(Brak danych klienta — analizujesz sam produkt. Pola „obwod...Klienta” oraz „refRozmiarWTabeli” zostaw jako null.)\n"
+    ? "\n(Brak danych klienta — analizujesz sam produkt. Pole „obwod...Klienta” zostaw jako null.)\n"
     : `- Płeć: ${input.gender === "female" ? "kobieta" : "mężczyzna"}
 - Wzrost: ${input.height} cm, waga: ${input.weight} kg
 - Budowa: ${input.bodyType || "standard"}
-${fitLine}${refLine}`;
+${fitLine}`;
 
   return `
 Jesteś ekspertem od rozmiarówek odzieży. Twoje ZADANIE: odczytać dane i je sklasyfikować.
@@ -383,7 +373,6 @@ ZWRÓĆ WYŁĄCZNIE czysty JSON (bez \`\`\`), dokładnie w tym kształcie:
   "odziezWierzchnia": false,
   "modelWzrost": null,
   "modelRozmiar": null,
-  "refRozmiarWTabeli": null,
   "zapasowyRozmiar": null,
   "zapasoweUzasadnienie": ""
 }
@@ -399,13 +388,23 @@ ZASADY:
 - "pasNaGumce": true jeśli pas jest elastyczny / na gumce / ze sznurkiem / ściągaczem (dresy, joggery). false dla sztywnego pasa z guzikiem (jeansy, chinosy, spodnie garniturowe).
 - "odziezWierzchnia": true dla kurtki, płaszcza, parki, marynarki noszonej na wierzch. false dla t-shirtu, bluzy, koszuli.
 - "modelWzrost" / "modelRozmiar": jeśli opis podaje wzorzec typu "Model ma 184 cm i nosi rozmiar L", wpisz 184 i "L". Inaczej null.
-- "refRozmiarWTabeli": gdy podano UBRANIE REFERENCYJNE marki rozpoznawalnej (sieciówka / duża marka), wpisz rozmiar z "tabela" (np. "M", "32"), który leżałby najbardziej podobnie. null tylko dla marki naprawdę nieznanej / lokalnej / handmade albo gdy nazwa/rozmiar to przypadkowy ciąg znaków. Nie zgaduj z sylwetki klienta.
 `;
 }
 
 // ---------------------------------------------------------------------------
 // Decyzja rozmiarowa – czysta funkcja, deterministyczna, testowalna
 // ---------------------------------------------------------------------------
+
+/** Wymiary ubrania, które klientowi leży idealnie — zmierzone NA PŁASKO, w cm.
+ *  `chest`/`waist`/`hip` = szerokość pacha–pacha (pas / biodra); silnik mnoży je
+ *  ×2, żeby porównać z pełnym obwodem w tabeli. `length`/`inseam` — jak są. */
+export type RefMeasurements = {
+  chest?: number;
+  waist?: number;
+  hip?: number;
+  length?: number;
+  inseam?: number;
+};
 
 type ResolveInput = {
   extraction: ChartExtraction;
@@ -417,8 +416,9 @@ type ResolveInput = {
   /** Korektę ze stylu marki stosujemy tylko, gdy realnie były notatki marki /
    *  produktu – inaczej model bywa nadgorliwy i przesuwa rozmiar bez powodu. */
   allowKorekta: boolean;
-  /** Dobrze leżące ubranie referencyjne podane przez klienta (marka + rozmiar). */
-  referenceGarment?: { brand: string; size: string } | null;
+  /** Wymiary dobrze leżącego ubrania klienta — porównanie ubranie-do-ubrania
+   *  na liczbach (bez AI). */
+  referenceGarment?: { measurements: RefMeasurements } | null;
   /** Wewnętrzne: głębokość rekurencji strażnika monotoniczności (patrz koniec
    *  resolveSize). Nie ustawiać z zewnątrz. */
   guardDepth?: number;
@@ -438,7 +438,7 @@ export type ResolveResult = {
   anchoredToModel: boolean;
   modelRef: { height: number; size: string } | null;
   /** ustawione, gdy rozmiar wyszedł z porównania do ubrania referencyjnego. */
-  matchedReference: { brand: string; size: string } | null;
+  matchedReference: { measurements: RefMeasurements } | null;
   /** Sąsiednie rozmiary z tabeli — do suwaka „ciaśniej ← Ty → luźniej". */
   neighborSmaller: string | null;
   neighborLarger: string | null;
@@ -531,27 +531,6 @@ function scaleFrom(
   );
 
   return { labels: shown.map((x) => x.label), pos, recIndex };
-}
-
-// Sito na oczywisty bełkot w nazwie marki podanej przez klienta (losowy ciąg
-// znaków typu „sdfsdfsdgfaf"). To NIE jest walidacja „czy marka istnieje" —
-// model dostaje osobną instrukcję o rozpoznawalności. Tu wyłapujemy tylko
-// wpisy, których żadna prawdziwa nazwa marki nie przypomina, żeby nie ufać im
-// nawet gdy model mimo wszystko zwróci rozmiar.
-function looksLikeRealBrandName(raw: string): boolean {
-  const s = raw.trim().toLowerCase();
-  if (s.length < 2) return false;
-  const tokens = s
-    .split(/[\s\-&.’'/]+/)
-    .filter((x) => x.length >= 3 && !/\d/.test(x));
-  if (tokens.length === 0) return true; // same inicjały / cyfry (H&M, 4F, A.P.C.)
-  const vowel = /[aeiouyàáâäãåèéêëìíîïòóôöõùúûüæøœ]/;
-  return tokens.every(
-    (tok) =>
-      vowel.test(tok) && // token bez samogłoski = bełkot
-      !/[bcdfghjklmnpqrstvwxzćłńśźż]{5,}/.test(tok) && // 5+ spółgłosek z rzędu
-      !/(.)\1\1\1/.test(tok), // 4× ta sama litera z rzędu
-  );
 }
 
 export function resolveSize(input: ResolveInput): ResolveResult | null {
@@ -663,99 +642,116 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
         )
       : undefined;
 
-  // --- Ubranie referencyjne klienta („mam Nike L, leży idealnie") ---
-  // Porównanie UBRANIE-DO-UBRANIA; najsilniejszy sygnał (od klienta, nie marki).
-  // ZABEZPIECZENIA, po kolei: (1) nazwa marki to bełkot → nie ufamy;
-  // (2) model zwrócił etykietę spoza tabeli → rIdx < 0 → nie wchodzimy;
-  // (3) rozmiar rażąco sprzeczny z obwodem ciała → odrzucamy i lecimy dalej.
-  if (input.referenceGarment && extraction.refEquivalentSize) {
-    const want = extraction.refEquivalentSize.toUpperCase().replace(/\s+/g, "");
-    const rIdx = rows.findIndex(
-      (r) => r.size.toUpperCase().replace(/\s+/g, "") === want,
-    );
-    const brandOk = looksLikeRealBrandName(input.referenceGarment.brand);
-    if (!brandOk) {
-      console.warn(
-        "[resolveSize] ubranie referencyjne odrzucone — nazwa marki wygląda na przypadkową",
-        { brand: input.referenceGarment.brand },
-      );
-    }
+  // --- Ubranie referencyjne klienta: wymiary ubrania, które leży idealnie ---
+  // Porównanie UBRANIE-DO-UBRANIA na liczbach (bez AI). Dla każdego wymiaru,
+  // który podał klient I który jest w tabeli, liczymy znormalizowany dystans do
+  // każdego wiersza; wygrywa wiersz o najmniejszej średniej. Bramka
+  // zdroworozsądkowa: wynik nie może odbiegać od rozmiaru z samej sylwetki
+  // bardziej niż +REF_MAX_LARGER / −REF_MAX_SMALLER — inaczej odrzucamy i
+  // lecimy dalej ścieżką obwodową.
+  const refM = input.referenceGarment?.measurements;
+  if (refM && rows.length >= 2) {
+    const refDims: Array<{
+      f: (r: NormalizedSizeRow) => number | null | undefined;
+      v: number;
+    }> = [];
+    const addDim = (
+      key: "chest" | "waist" | "hip" | "length" | "inseam",
+      raw: number | undefined,
+      double: boolean,
+    ) => {
+      const f = (r: NormalizedSizeRow) => r[key];
+      if (typeof raw === "number" && raw > 0 && spread(f) >= 1) {
+        refDims.push({ f, v: double ? raw * 2 : raw });
+      }
+    };
+    // szerokość pacha–pacha → ×2 (tabela ma pełny obwód); długości bez zmian
+    addDim("chest", refM.chest, true);
+    addDim("waist", refM.waist, true);
+    addDim("hip", refM.hip, true);
+    addDim("length", refM.length, false);
+    addDim("inseam", refM.inseam, false);
 
-    // Zdroworozsądkowa kontrola: najbliższy rozmiar wg samego obwodu ciała.
-    let refTrusted = rIdx >= 0 && brandOk;
-    if (rIdx >= 0 && usable.length >= 2) {
-      const centerEase = (easeLo + easeHi) / 2;
-      const target = bodyPrimary + centerEase;
-      let bodyIdx = rIdx;
-      let bestGap = Infinity;
+    if (refDims.length) {
+      let bestIdx = -1;
+      let bestScore = Infinity;
       rows.forEach((r, i) => {
-        const p = primaryOf(r);
-        if (typeof p === "number" && p > 0) {
-          const gap = Math.abs(p - target);
-          if (gap < bestGap) {
-            bestGap = gap;
-            bodyIdx = i;
-          }
+        let sum = 0;
+        let n = 0;
+        for (const d of refDims) {
+          const val = d.f(r);
+          if (typeof val !== "number" || val <= 0) continue;
+          sum += Math.abs(val - d.v) / Math.max(1, spread(d.f));
+          n += 1;
+        }
+        if (n && sum / n < bestScore) {
+          bestScore = sum / n;
+          bestIdx = i;
         }
       });
-      const delta = rIdx - bodyIdx; // + = ref większy niż sugeruje sylwetka
-      if (delta > REF_MAX_LARGER || delta < -REF_MAX_SMALLER) {
-        refTrusted = false;
+
+      if (bestIdx >= 0) {
+        // najbliższy rozmiar wg samego obwodu ciała — do bramki
+        const centerEase = (easeLo + easeHi) / 2;
+        const target = bodyPrimary + centerEase;
+        let bodyIdx = bestIdx;
+        let bestGap = Infinity;
+        rows.forEach((r, i) => {
+          const p = primaryOf(r);
+          if (typeof p === "number" && p > 0 && Math.abs(p - target) < bestGap) {
+            bestGap = Math.abs(p - target);
+            bodyIdx = i;
+          }
+        });
+        const delta = bestIdx - bodyIdx; // + = większy niż sugeruje sylwetka
+
+        if (delta <= REF_MAX_LARGER && delta >= -REF_MAX_SMALLER) {
+          let idx = bestIdx;
+          let tie: ResolveResult["tieBrokenBy"] = "single";
+          if (fit === "fitted" && idx > 0) {
+            idx -= 1;
+            tie = "fit";
+          } else if (fit === "loose" && idx < rows.length - 1) {
+            idx += 1;
+            tie = "fit";
+          }
+          let chosen = rows[idx];
+          let korektaApplied: -1 | 0 | 1 = 0;
+          const k = extraction.korekta;
+          if (allowKorekta && (k === -1 || k === 1)) {
+            const ni = clamp(idx + k, 0, rows.length - 1);
+            if (ni !== idx) {
+              chosen = rows[ni];
+              korektaApplied = k;
+            }
+          }
+          const rv = (r: NormalizedSizeRow) =>
+            (useWaist ? r.waist : (r.chest ?? r.hip ?? r.waist)) as number;
+          return {
+            size: normSize(chosen.size),
+            mode: useWaist ? "waist" : "chest",
+            chosenValue: Math.round(rv(chosen) || 0),
+            bodyPrimaryUsed: Math.round(bodyPrimary),
+            window: [0, 0],
+            candidates: [normSize(rows[bestIdx].size)],
+            korektaApplied,
+            tieBrokenBy: tie,
+            anchoredToModel: false,
+            modelRef: null,
+            matchedReference: { measurements: refM },
+            ...neighborLabels(rows, chosen.size),
+            fitScale: scaleFrom(
+              rows.map((r) => ({ label: normSize(r.size), v: rv(r) })),
+              target,
+              chosen.size,
+            ),
+          };
+        }
         console.warn(
-          "[resolveSize] ubranie referencyjne odrzucone — kłóci się z obwodem ciała",
-          {
-            brand: input.referenceGarment.brand,
-            size: input.referenceGarment.size,
-            refSize: rows[rIdx].size,
-            bodySize: rows[bodyIdx].size,
-            delta,
-          },
+          "[resolveSize] ubranie referencyjne odrzucone — kłóci się z sylwetką",
+          { bestSize: rows[bestIdx].size, bodySize: rows[bodyIdx].size, delta },
         );
       }
-    }
-
-    if (refTrusted) {
-      let idx = rIdx;
-      let tie: ResolveResult["tieBrokenBy"] = "single";
-      if (fit === "fitted" && idx > 0) {
-        idx -= 1;
-        tie = "fit";
-      } else if (fit === "loose" && idx < rows.length - 1) {
-        idx += 1;
-        tie = "fit";
-      }
-      let chosen = rows[idx];
-      let korektaApplied: -1 | 0 | 1 = 0;
-      const k = extraction.korekta;
-      if (allowKorekta && (k === -1 || k === 1)) {
-        const ni = clamp(idx + k, 0, rows.length - 1);
-        if (ni !== idx) {
-          chosen = rows[ni];
-          korektaApplied = k;
-        }
-      }
-      const refValueOf = (r: NormalizedSizeRow) =>
-        (useWaist ? r.waist : (r.chest ?? r.hip ?? r.waist)) as number;
-      const pv = refValueOf(chosen);
-      return {
-        size: chosen.size.toUpperCase().replace(/\s+/g, ""),
-        mode: useWaist ? "waist" : "chest",
-        chosenValue: Math.round((pv as number) || 0),
-        bodyPrimaryUsed: Math.round(bodyPrimary),
-        window: [0, 0],
-        candidates: [rows[rIdx].size.toUpperCase().replace(/\s+/g, "")],
-        korektaApplied,
-        tieBrokenBy: tie,
-        anchoredToModel: false,
-        modelRef: null,
-        matchedReference: input.referenceGarment,
-        ...neighborLabels(rows, chosen.size),
-        fitScale: scaleFrom(
-          rows.map((r) => ({ label: normSize(r.size), v: refValueOf(r) })),
-          bodyPrimary + (easeLo + easeHi) / 2,
-          chosen.size,
-        ),
-      };
     }
   }
 
@@ -1180,8 +1176,8 @@ function buildExplanation(
   const headline =
     r.matchedReference
       ? locale === "pl"
-        ? `Rozmiar ${r.size} — leży podobnie jak Twoje „${r.matchedReference.brand} ${r.matchedReference.size}".`
-        : `Size ${r.size} — fits like your “${r.matchedReference.brand} ${r.matchedReference.size}”.`
+        ? `Rozmiar ${r.size} — leży podobnie jak ubranie, które u Ciebie pasuje.`
+        : `Size ${r.size} — fits like the garment that already works for you.`
       : r.anchoredToModel
         ? locale === "pl"
           ? `Rozmiar ${r.size} — dobrany do Twojego wzrostu wg wzorca marki.`
@@ -1193,7 +1189,7 @@ function buildExplanation(
   if (locale === "pl") {
     if (r.matchedReference) {
       parts.push(
-        `Rozmiar ${r.size} — leży podobnie jak „${r.matchedReference.brand} ${r.matchedReference.size}", które u Ciebie pasuje.`,
+        `Rozmiar ${r.size} — dobrany tak, by leżał jak podane przez Ciebie, dobrze leżące ubranie (porównaliśmy wymiary ubranie-do-ubrania).`,
       );
     } else if (r.anchoredToModel && r.modelRef) {
       parts.push(
@@ -1237,7 +1233,7 @@ function buildExplanation(
   } else {
     if (r.matchedReference) {
       parts.push(
-        `Size ${r.size} — fits like the “${r.matchedReference.brand} ${r.matchedReference.size}” that already works for you.`,
+        `Size ${r.size} — chosen to fit like the well-fitting garment you gave us (we compared measurements garment-to-garment).`,
       );
     } else if (r.anchoredToModel && r.modelRef) {
       parts.push(
@@ -1301,7 +1297,7 @@ export type AICallInput = {
     /** true → wolno zastosować korektę rozmiaru ze stylu marki / notatek. */
     allowKorekta?: boolean;
     /** Dobrze leżące ubranie referencyjne podane przez klienta. */
-    referenceGarment?: { brand: string; size: string } | null;
+    referenceGarment?: { measurements: RefMeasurements } | null;
   };
 };
 

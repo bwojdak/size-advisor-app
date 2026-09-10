@@ -149,8 +149,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const bodyType = String(parsed.bodyType ?? "").slice(0, 20) || null;
     const locale = parsed.locale;
     const fitPreference = parsed.fitPreference;
-    const refBrand = parsed.refBrand;
-    const refSize = parsed.refSize;
+    const refMeasurementsRaw = parsed.refMeasurements;
     const productId = parsed.productId;
 
     // Wzrost / waga: twarda walidacja liczbowa po stronie serwera. Widżet pilnuje
@@ -185,14 +184,30 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const settings = await loadShopSettings(shop);
     const caps = planCaps(settings.plan);
 
-    // Ubranie referencyjne „mam Nike L, leży idealnie" — tylko gdy plan i sklep
-    // to włączają.
-    const refBrandS = String(refBrand ?? "").trim().slice(0, 40);
-    const refSizeS = String(refSize ?? "").trim().slice(0, 16);
-    const referenceGarment =
-      caps.garmentMatch && settings.askGarmentMatch && refBrandS && refSizeS
-        ? { brand: refBrandS, size: refSizeS }
-        : null;
+    // Ubranie referencyjne — wymiary ubrania, które klientowi leży idealnie
+    // (na płasko, w cm). Tylko gdy plan i sklep to włączają.
+    const refMeasurements = (() => {
+      if (!caps.garmentMatch || !settings.askGarmentMatch) return null;
+      const src =
+        refMeasurementsRaw && typeof refMeasurementsRaw === "object"
+          ? (refMeasurementsRaw as Record<string, unknown>)
+          : {};
+      const out: {
+        chest?: number;
+        waist?: number;
+        hip?: number;
+        length?: number;
+        inseam?: number;
+      } = {};
+      for (const key of ["chest", "waist", "hip", "length", "inseam"] as const) {
+        const n = Number(src[key]);
+        if (Number.isFinite(n) && n >= 15 && n <= 150) out[key] = Math.round(n);
+      }
+      return Object.keys(out).length ? out : null;
+    })();
+    const referenceGarment = refMeasurements
+      ? { measurements: refMeasurements }
+      : null;
 
     // Plan bez wielojęzyczności → odpowiedź AI zawsze w jednym języku sklepu.
     const requestedLocale =
@@ -291,9 +306,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       weight: Number(weight),
       bodyType: bodyType || "standard",
       fit: fit || "",
-      ref: referenceGarment
-        ? `${referenceGarment.brand}|${referenceGarment.size}`
-        : "",
+      ref: referenceGarment ? JSON.stringify(referenceGarment.measurements) : "",
       productTitle: productTitle || "",
       productDescription: productDescription || "",
       brandStyleNotes: brandStyleNotes || "",
@@ -331,9 +344,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalSource = cached.source;
     } else if (
       // Gotowa analiza produktu z konfiguracji → decyzja bez wołania AI.
-      // Pomijamy, gdy klient podał ubranie referencyjne (potrzebny świeży
-      // „refRozmiarWTabeli”) albo gdy zmieniła się wersja logiki ekstrakcji.
-      !referenceGarment &&
+      // Ubranie referencyjne dopasowujemy deterministycznie (na liczbach), więc
+      // NIE trzeba już świeżej analizy AI — działa na zapisanej ekstrakcji.
       chartJson &&
       chartVersion === EXTRACTION_VERSION &&
       parseStoredExtraction(chartJson)
@@ -359,7 +371,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       );
     } else if (
       // Cache analizy produktu niekonfigurowanego → decyzja bez wołania AI.
-      !referenceGarment &&
       productAnalysis &&
       productAnalysis.extractionVersion === EXTRACTION_VERSION &&
       Date.now() - productAnalysis.analyzedAt.getTime() < ANALYSIS_TTL_MS &&
@@ -404,7 +415,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         productNotes: chartNotes,
         hasSizeChartImage: useImage,
         fitPreference: fit,
-        referenceGarment,
         responseLanguage: responseLocale,
       });
 
@@ -466,11 +476,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       );
 
       // Zapisz świeżą analizę produktu, żeby kolejne zapytania (tego i innych
-      // klientów) nie wołały już modelu. Nie zapisujemy, gdy w prompt weszło
-      // ubranie referencyjne klienta — JSON byłby „skażony”.
+      // klientów) nie wołały już modelu. Ubranie referencyjne nie wchodzi już do
+      // promptu (dopasowanie jest deterministyczne), więc JSON jest czysty.
       // Produkt skonfigurowany przez admina → na regule; inaczej → do cache
       // ProductAnalysis (osobne od limitu planu i listy w panelu).
-      if (!referenceGarment) {
+      {
         try {
           if (sizingSystem) {
             await db.sizingSystem.update({
