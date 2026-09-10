@@ -9,6 +9,7 @@ import {
   EXTRACTION_VERSION,
   getAIConfig,
   AIQuotaError,
+  type FitScale,
 } from "../lib/size-advisor.server";
 import { loadShopSettings } from "../lib/shop-settings.server";
 import { planCaps } from "../lib/plans";
@@ -31,7 +32,7 @@ const recommendationCache = new Map<
     detail: string;
     nbSmaller: string | null;
     nbLarger: string | null;
-    fitOffset: number | null;
+    fitScale: FitScale | null;
     ts: number;
   }
 >();
@@ -53,7 +54,7 @@ function setCachedRecommendation(
   detail: string,
   nbSmaller: string | null,
   nbLarger: string | null,
-  fitOffset: number | null,
+  fitScale: FitScale | null,
 ) {
   if (recommendationCache.size >= CACHE_MAX) {
     const oldest = recommendationCache.keys().next().value;
@@ -65,7 +66,7 @@ function setCachedRecommendation(
     detail,
     nbSmaller,
     nbLarger,
-    fitOffset,
+    fitScale,
     ts: Date.now(),
   });
 }
@@ -302,7 +303,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     let finalDetail: string;
     let finalNbSmaller: string | null = null;
     let finalNbLarger: string | null = null;
-    let finalFitOffset: number | null = null;
+    let finalFitScale: FitScale | null = null;
 
     const decision = {
       height,
@@ -322,7 +323,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalDetail = cached.detail;
       finalNbSmaller = cached.nbSmaller;
       finalNbLarger = cached.nbLarger;
-      finalFitOffset = cached.fitOffset;
+      finalFitScale = cached.fitScale;
     } else if (
       // Gotowa analiza produktu z konfiguracji → decyzja bez wołania AI.
       // Pomijamy, gdy klient podał ubranie referencyjne (potrzebny świeży
@@ -339,7 +340,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalDetail = decided.explanationDetail;
       finalNbSmaller = decided.neighborSmaller;
       finalNbLarger = decided.neighborLarger;
-      finalFitOffset = decided.fitOffset;
+      finalFitScale = decided.fitScale;
       setCachedRecommendation(
         cacheKey,
         finalSize,
@@ -347,7 +348,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         finalDetail,
         finalNbSmaller,
         finalNbLarger,
-        finalFitOffset,
+        finalFitScale,
       );
     } else if (
       // Cache analizy produktu niekonfigurowanego → decyzja bez wołania AI.
@@ -364,7 +365,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalDetail = decided.explanationDetail;
       finalNbSmaller = decided.neighborSmaller;
       finalNbLarger = decided.neighborLarger;
-      finalFitOffset = decided.fitOffset;
+      finalFitScale = decided.fitScale;
       setCachedRecommendation(
         cacheKey,
         finalSize,
@@ -372,7 +373,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         finalDetail,
         finalNbSmaller,
         finalNbLarger,
-        finalFitOffset,
+        finalFitScale,
       );
     } else {
       // Zdjęcie rozmiarówki tylko w planach z multimodalnym AI i tylko dla
@@ -442,7 +443,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalDetail = result.explanationDetail;
       finalNbSmaller = result.neighborSmaller;
       finalNbLarger = result.neighborLarger;
-      finalFitOffset = result.fitOffset;
+      finalFitScale = result.fitScale;
       setCachedRecommendation(
         cacheKey,
         finalSize,
@@ -450,7 +451,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         finalDetail,
         finalNbSmaller,
         finalNbLarger,
-        finalFitOffset,
+        finalFitScale,
       );
 
       // Zapisz świeżą analizę produktu, żeby kolejne zapytania (tego i innych
@@ -535,7 +536,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       explanationDetail: finalDetail,
       neighborSmaller: finalNbSmaller,
       neighborLarger: finalNbLarger,
-      fitOffset: finalFitOffset,
+      fitScale: finalFitScale,
     });
   } catch (error) {
     console.error("Endpoint Handler Error:", error);

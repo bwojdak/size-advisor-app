@@ -270,26 +270,23 @@ function chestBands(gender: string): Array<[number, string]> {
     : [[86, "XS"], [94, "S"], [102, "M"], [110, "L"], [118, "XL"], [128, "XXL"]];
 }
 
-/** Pozycja obwodu klatki w OBRĘBIE pasma danego rozmiaru → [-1, 1] dla pinezki
- *  na suwaku, gdy rozmiar wyszedł z oszacowania (produkt bez tabeli). Ujemne =
- *  przy dolnej granicy (ku mniejszemu), dodatnie = przy górnej (ku większemu).
- *  null, gdy etykieta jest spoza pasm (rozmiary liczbowe, XXS, 3XL+). */
-function estimateFitOffset(
+/** Suwak dopasowania, gdy rozmiar wyszedł z oszacowania (produkt bez tabeli):
+ *  wartość reprezentatywna pasma = jego środek, a `scaleFrom` interpoluje po
+ *  nich szacowany obwód klatki. Pinezka jedzie płynnie ze wzrostem i wagą. */
+function estimateFitScale(
   chest: number,
   gender: string,
-  label: string,
-): number | null {
+  size: string,
+): FitScale | null {
   const bands = chestBands(gender);
-  const i = bands.findIndex(([, s]) => s === label);
-  if (i < 0) return null;
-  const hiEdge = bands[i][0];
-  const loEdge =
-    i > 0
-      ? bands[i - 1][0]
-      : hiEdge - (bands[i + 1] ? bands[i + 1][0] - hiEdge : 8);
-  if (!(hiEdge > loEdge)) return null;
-  const p = (chest - loEdge) / (hiEdge - loEdge); // 0..1 w paśmie
-  return clamp(p * 2 - 1, -1, 1);
+  const pool = bands.map(([hi, label], i) => {
+    const lo =
+      i > 0
+        ? bands[i - 1][0]
+        : hi - (bands[i + 1] ? bands[i + 1][0] - hi : 8);
+    return { label, v: (lo + hi) / 2 };
+  });
+  return scaleFrom(pool, chest, size);
 }
 
 // ---------------------------------------------------------------------------
@@ -424,11 +421,21 @@ export type ResolveResult = {
   /** Sąsiednie rozmiary z tabeli — do suwaka „ciaśniej ← Ty → luźniej". */
   neighborSmaller: string | null;
   neighborLarger: string | null;
-  /** Pozycja ciała W OBRĘBIE wybranego rozmiaru, do przesunięcia pinezki na
-   *  suwaku. Zakres [-1, 1]: -1 = przy dolnej granicy (ku mniejszemu sąsiadowi),
-   *  0 = środek, +1 = przy górnej granicy (ku większemu). null = nie policzono
-   *  (tryb bez wymiarów: ubranie referencyjne, oszacowanie bez tabeli). */
-  fitOffset: number | null;
+  /** Suwak dopasowania dla widżetu — patrz `FitScale`. null, gdy nie da się
+   *  policzyć (za mało wierszy z wymiarami, niemonotoniczna tabela). */
+  fitScale: FitScale | null;
+};
+
+/** „Progress bar" dopasowania w widżecie. `labels` to 2–3 rozmiary w RÓWNO
+ *  rozłożonych komórkach (etykiety trzymają się CIAŁA, nie rekomendacji, więc
+ *  przy zmianie rozmiaru pinezka nie przeskakuje). `pos` ∈ [0.05, 0.95] to
+ *  pozycja pinezki „Ty" wzdłuż toru — `target` (idealny wymiar dla sylwetki)
+ *  interpolowany liniowo między środkami komórek, z ekstrapolacją poza końce.
+ *  `recIndex` wskazuje rekomendowany rozmiar w `labels` (pogrubiony). */
+export type FitScale = {
+  labels: string[];
+  pos: number;
+  recIndex: number;
 };
 
 const normSize = (s: string) => s.toUpperCase().replace(/\s+/g, "");
@@ -444,6 +451,58 @@ function neighborLabels(
     neighborLarger:
       i >= 0 && i < rows.length - 1 ? normSize(rows[i + 1].size) : null,
   };
+}
+
+/** Buduje `FitScale` = „progress bar" dopasowania.
+ *
+ *  1. `gIdx` — pozycja `value` w GLOBALNEJ skali indeksów rozmiarów (float),
+ *     interpolowana liniowo między wartościami wierszy, z ekstrapolacją poza
+ *     końce (może wyjść poza [0, len-1]).
+ *  2. Okno 2–3 komórek wyśrodkowane na `round(gIdx)` — czyli na najbliższym
+ *     CAŁYM rozmiarze względem sylwetki, NIE na rekomendacji. Dzięki temu przy
+ *     zmianie rekomendacji (np. S→M o 1 cm) okno się nie przesuwa i pinezka
+ *     jedzie płynnie — zmienia się tylko podświetlona komórka. Skok pojawia się
+ *     dopiero, gdy sylwetka minie sam środek między dwoma rozmiarami.
+ *  3. `pos` — pozycja pinezki: `gIdx` przeliczone na ułamek toru wg środków
+ *     komórek okna, docięte do [0.03, 0.97]. */
+function scaleFrom(
+  pool: Array<{ label: string; v: number }>,
+  value: number,
+  recLabel: string,
+): FitScale | null {
+  const pts = pool.filter((x) => Number.isFinite(x.v) && x.v > 0);
+  if (pts.length < 2 || !Number.isFinite(value)) return null;
+  for (let i = 1; i < pts.length; i++) {
+    if (!(pts[i].v > pts[i - 1].v)) return null; // niemonotoniczne → odpuść
+  }
+
+  const last = pts.length - 1;
+  let gIdx: number;
+  if (value <= pts[0].v) {
+    const slope = pts[1].v - pts[0].v;
+    gIdx = slope > 0 ? (value - pts[0].v) / slope : 0;
+  } else if (value >= pts[last].v) {
+    const slope = pts[last].v - pts[last - 1].v;
+    gIdx = slope > 0 ? last - 1 + (value - pts[last - 1].v) / slope : last;
+  } else {
+    let k = 1;
+    while (k < pts.length && value > pts[k].v) k++;
+    gIdx = k - 1 + (value - pts[k - 1].v) / (pts[k].v - pts[k - 1].v);
+  }
+
+  const size = Math.min(3, pts.length);
+  const start = clamp(Math.round(gIdx) - 1, 0, pts.length - size);
+  const shown = pts.slice(start, start + size);
+  const n = shown.length;
+
+  const pos = clamp((gIdx - start + 0.5) / n, 0.03, 0.97);
+
+  let recIndex = shown.findIndex((x) => x.label === normSize(recLabel));
+  if (recIndex < 0) {
+    const recAll = pts.findIndex((x) => x.label === normSize(recLabel));
+    recIndex = recAll >= 0 && recAll < start ? 0 : n - 1;
+  }
+  return { labels: shown.map((x) => x.label), pos, recIndex };
 }
 
 // Sito na oczywisty bełkot w nazwie marki podanej przez klienta (losowy ciąg
@@ -647,9 +706,9 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
           korektaApplied = k;
         }
       }
-      const pv = useWaist
-        ? chosen.waist
-        : (chosen.chest ?? chosen.hip ?? chosen.waist);
+      const refValueOf = (r: NormalizedSizeRow) =>
+        (useWaist ? r.waist : (r.chest ?? r.hip ?? r.waist)) as number;
+      const pv = refValueOf(chosen);
       return {
         size: chosen.size.toUpperCase().replace(/\s+/g, ""),
         mode: useWaist ? "waist" : "chest",
@@ -663,7 +722,11 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
         modelRef: null,
         matchedReference: input.referenceGarment,
         ...neighborLabels(rows, chosen.size),
-        fitOffset: null,
+        fitScale: scaleFrom(
+          rows.map((r) => ({ label: normSize(r.size), v: refValueOf(r) })),
+          bodyPrimary + (easeLo + easeHi) / 2,
+          chosen.size,
+        ),
       };
     }
   }
@@ -697,6 +760,9 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
   let window: [number, number];
   let valueOf: (r: NormalizedSizeRow) => number;
   let target: number;
+  // Wersja `target` bez zaokrąglenia — tylko do pozycji pinezki na suwaku, żeby
+  // 1 cm wzrostu przesuwał ją odrobinę, a nie o krok (patrz tryb długościowy).
+  let scaleTarget: number | undefined;
   let anchoredToModel = false;
 
   if (
@@ -741,7 +807,8 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
     const median = (lens[Math.floor(mid)] + lens[Math.ceil(mid)]) / 2;
     // 0.25 cm docelowej długości na 1 cm wzrostu → ~1 rozmiar na 7–8 cm.
     // Wyżej (0.38) boxy topy skakały o rozmiar co ~4 cm wzrostu.
-    target = Math.round(median + (height - 178) * 0.25);
+    scaleTarget = median + (height - 178) * 0.25;
+    target = Math.round(scaleTarget);
     window = [target - TOP_LENGTH_TOL, target + TOP_LENGTH_TOL];
     candRows = pool.filter(
       (r) => valueOf(r) >= window[0] && valueOf(r) <= window[1],
@@ -928,40 +995,14 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
 
   const finalPrimary = useWaist ? chosen.waist : chosen.chest;
 
-  // Pozycja ciała w obrębie wybranego rozmiaru — jak daleko `target` (idealny
-  // wymiar dla tej sylwetki) leży od wartości wybranego rozmiaru, w skali do
-  // POŁOWY odstępu do sąsiada po tej stronie. Wynik [-1, 1] przesuwa pinezkę
-  // na suwaku: >0 = bliżej większego rozmiaru, <0 = bliżej mniejszego.
-  let fitOffset: number | null = null;
-  {
-    const ci = rows.findIndex((r) => normSize(r.size) === normSize(chosen.size));
-    const chosenVal = valueOf(chosen);
-    if (
-      ci >= 0 &&
-      Number.isFinite(chosenVal) &&
-      chosenVal > 0 &&
-      Number.isFinite(target)
-    ) {
-      const delta = target - chosenVal; // + = sylwetka większa niż ten rozmiar
-      const upVal = ci < rows.length - 1 ? valueOf(rows[ci + 1]) : NaN;
-      const downVal = ci > 0 ? valueOf(rows[ci - 1]) : NaN;
-      const gapUp =
-        Number.isFinite(upVal) && upVal > chosenVal ? upVal - chosenVal : NaN;
-      const gapDown =
-        Number.isFinite(downVal) && downVal > 0 && downVal < chosenVal
-          ? chosenVal - downVal
-          : NaN;
-      if (Math.abs(delta) < 0.05) {
-        fitOffset = 0;
-      } else if (delta > 0 && Number.isFinite(gapUp)) {
-        fitOffset = clamp(delta / (gapUp / 2), 0, 1);
-      } else if (delta < 0 && Number.isFinite(gapDown)) {
-        fitOffset = -clamp(-delta / (gapDown / 2), 0, 1);
-      } else {
-        fitOffset = 0;
-      }
-    }
-  }
+  // Suwak dla widżetu: interpoluj `scaleTarget` (idealny wymiar dla sylwetki,
+  // bez zaokrągleń) po wartościach wierszy tabeli w tym samym wymiarze, którym
+  // grało `resolveSize`. Pinezka jedzie płynnie po całej skali.
+  const fitScale = scaleFrom(
+    rows.map((r) => ({ label: normSize(r.size), v: valueOf(r) })),
+    scaleTarget ?? target,
+    chosen.size,
+  );
 
   return {
     size: chosen.size.toUpperCase().replace(/\s+/g, ""),
@@ -981,7 +1022,7 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
         : null,
     matchedReference: null,
     ...neighborLabels(rows, chosen.size),
-    fitOffset,
+    fitScale,
   };
 }
 
@@ -1190,8 +1231,8 @@ export type AICallResult = {
   /** Sąsiednie rozmiary — do suwaka „ciaśniej ← Ty → luźniej" w widżecie. */
   neighborSmaller: string | null;
   neighborLarger: string | null;
-  /** Pozycja pinezki w obrębie rozmiaru na suwaku: [-1, 1] lub null. */
-  fitOffset: number | null;
+  /** Suwak dopasowania dla widżetu — patrz `FitScale`. */
+  fitScale: FitScale | null;
   attachedImage: boolean;
   promptTokenCount: number | null;
   candidatesTokenCount: number | null;
@@ -1340,7 +1381,7 @@ export function decideSize(
       source: "chart",
       neighborSmaller: resolved.neighborSmaller,
       neighborLarger: resolved.neighborLarger,
-      fitOffset: resolved.fitOffset,
+      fitScale: resolved.fitScale,
     };
   }
 
@@ -1389,11 +1430,11 @@ export function decideSize(
     source: "estimate",
     neighborSmaller: estSmaller,
     neighborLarger: estLarger,
-    // Bez tabeli: pozycja pinezki z pasma obwodu klatki (zmienia się ze wzrostem
-    // i wagą). null tylko gdy brak wzrostu albo rozmiar spoza pasm literowych.
-    fitOffset:
+    // Bez tabeli: suwak z pasm obwodu klatki (zmienia się ze wzrostem i wagą).
+    // null tylko gdy brak wzrostu albo rozmiar spoza pasm literowych.
+    fitScale:
       height > 0
-        ? estimateFitOffset(
+        ? estimateFitScale(
             estimateChest(height, weight, gender, bodyType),
             gender,
             size,

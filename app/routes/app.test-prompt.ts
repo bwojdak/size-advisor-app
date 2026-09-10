@@ -131,7 +131,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       explanationDetail: result.explanationDetail,
       neighborSmaller: result.neighborSmaller,
       neighborLarger: result.neighborLarger,
-      fitOffset: result.fitOffset,
+      fitScale: result.fitScale,
       usedBrandStyle: Boolean(settings?.aiStyleNotes?.trim()),
       productTitle,
       usedProductChart: Boolean(productRule?.parsedSizeData?.trim() || useImage),

@@ -458,16 +458,40 @@
   }
   .sa-why-detail[hidden] { display: none; }
 
-  /* Skala dopasowania: ciągły tor + krótki „suwak" (pinezka „Ty") wycentrowany
-     pod pozycją kupującego; może zachodzić na sąsiednie rozmiary. */
+  /* Skala dopasowania = progress bar: tor z wypełnieniem rosnącym do pinezki
+     „Ty", pod spodem stałe komórki rozmiarów. Pozycja z `fitScale.pos` (silnik
+     interpoluje ją płynnie, więc pinezka nie przeskakuje przy zmianie rozmiaru). */
   .sa-fit-scale { margin-top: 16px; }
+  .sa-fit-ends {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sa-muted);
+  }
   .sa-fit-tw { position: relative; padding-top: 22px; }
   .sa-fit-track {
     position: relative;
-    height: 8px;
+    height: 6px;
     border-radius: 999px;
     background: var(--sa-border);
     overflow: hidden;
+  }
+  .sa-fit-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--sa-accent);
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--sa-accent) 12%, transparent),
+      var(--sa-accent)
+    );
   }
   .sa-fit-tick {
     position: absolute;
@@ -476,20 +500,11 @@
     width: 2px;
     transform: translateX(-50%);
     background: #fff;
-    opacity: 0.75;
-  }
-  .sa-fit-fill {
-    position: absolute;
-    top: 0;
-    height: 100%;
-    width: 42px;
-    transform: translateX(-50%);
-    border-radius: 999px;
-    background: var(--sa-accent);
+    opacity: 0.8;
   }
   .sa-fit-pin {
     position: absolute;
-    bottom: 8px;
+    bottom: 6px;
     transform: translateX(-50%);
     display: flex;
     flex-direction: column;
@@ -517,24 +532,23 @@
     border-right: 5px solid transparent;
     border-top: 5px solid var(--sa-accent);
   }
-  .sa-fit-lbls { display: flex; margin-top: 5px; }
-  .sa-fit-lbl {
+  .sa-fit-cells { display: flex; gap: 6px; margin-top: 8px; }
+  .sa-fit-cell {
     flex: 1;
     text-align: center;
-    font-size: 12px;
+    padding: 6px 4px;
+    border: 1px solid var(--sa-border);
+    border-radius: var(--sa-radius);
+    background: #fff;
+    font-size: 13px;
     font-weight: 600;
     color: var(--sa-muted);
   }
-  .sa-fit-lbl--you { color: #1f2430; font-weight: 700; }
-  .sa-fit-ends {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 4px;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--sa-muted);
+  .sa-fit-cell--rec {
+    color: #1f2430;
+    font-weight: 700;
+    border-color: var(--sa-accent);
+    background: color-mix(in srgb, var(--sa-accent) 10%, #fff);
   }
 
   .sa-result--err {
@@ -926,56 +940,62 @@
       resultDiv.innerHTML = html;
     }
 
-    // Skala dopasowania: ciągły tor z podziałką na rozmiary (S / M / L pod spodem)
-    // i krótki „suwak" (pinezka „Ty" + wypełnienie) wycentrowany dokładnie pod
-    // pozycją kupującego — wolno mu zachodzić na sąsiedni rozmiar. `fitOffset`
-    // z /recommend (∈ [-1,1]); chowa się, gdy nie ma żadnego sąsiada.
+    // Skala dopasowania = progress bar. `data.fitScale` z /recommend niesie
+    // gotowe { labels, pos, recIndex } — silnik interpoluje `pos` płynnie, więc
+    // pinezka „Ty" jedzie po całym torze i nie przeskakuje przy zmianie rozmiaru.
+    // Fallback (stare odpowiedzi / brak fitScale): sklej z sąsiadów, pinezka na
+    // środku komórki rekomendowanego rozmiaru.
     function fitScaleHtml(data) {
-      const sm = data && data.neighborSmaller;
-      const lg = data && data.neighborLarger;
-      const mid = data && data.size;
-      if (!sm && !lg) return '';
-      const sizes = [];
-      if (sm) sizes.push(sm);
-      sizes.push(mid);
-      if (lg) sizes.push(lg);
-      const youIdx = sm ? 1 : 0;
-      const n = sizes.length;
-      // −1 = przy dolnej granicy rozmiaru (ku mniejszemu), +1 = przy górnej.
-      // Suwak jedzie prawie do samej kreski podziału (0.95 połowy segmentu).
-      let off = Number(data && data.fitOffset);
-      if (!Number.isFinite(off)) off = 0;
-      off = Math.max(-1, Math.min(1, off));
-      let pinFrac = (youIdx + 0.5) / n + off * 0.95 * (0.5 / n);
-      // Trzymaj „Ty" z dala od krawędzi, żeby dymek się nie ucinał.
-      pinFrac = Math.max(0.07, Math.min(0.93, pinFrac));
-      const pinLeft = (pinFrac * 100).toFixed(1);
+      let labels;
+      let pos;
+      let recIndex;
+      const fs = data && data.fitScale;
+      if (fs && Array.isArray(fs.labels) && fs.labels.length >= 2) {
+        labels = fs.labels.slice(0, 4).map(String);
+        recIndex = Math.max(0, Math.min(labels.length - 1, fs.recIndex | 0));
+        pos = Number(fs.pos);
+        if (!Number.isFinite(pos)) pos = (recIndex + 0.5) / labels.length;
+      } else {
+        const sm = data && data.neighborSmaller;
+        const lg = data && data.neighborLarger;
+        const mid = data && data.size;
+        if (!sm && !lg) return '';
+        labels = [];
+        if (sm) labels.push(String(sm));
+        labels.push(String(mid));
+        if (lg) labels.push(String(lg));
+        recIndex = sm ? 1 : 0;
+        pos = (recIndex + 0.5) / labels.length;
+      }
+      pos = Math.max(0.04, Math.min(0.96, pos));
+      const n = labels.length;
+      const pct = (pos * 100).toFixed(1);
       let ticks = '';
       for (let i = 1; i < n; i++) {
         ticks +=
           '<span class="sa-fit-tick" style="left:' +
           ((i / n) * 100).toFixed(1) + '%"></span>';
       }
-      const lbls = sizes
+      const cells = labels
         .map((s, i) =>
-          '<span class="sa-fit-lbl' + (i === youIdx ? ' sa-fit-lbl--you' : '') + '">' +
-          esc(s) + '</span>')
+          '<span class="sa-fit-cell' + (i === recIndex ? ' sa-fit-cell--rec' : '') +
+          '">' + esc(s) + '</span>')
         .join('');
       return (
         '<div class="sa-fit-scale">' +
-          '<div class="sa-fit-tw">' +
-            '<span class="sa-fit-pin" style="left:' + pinLeft + '%">' +
-              '<span class="sa-fit-pin-tag">' + esc(t('fit_you', 'Ty')) + '</span>' +
-            '</span>' +
-            '<div class="sa-fit-track">' + ticks +
-              '<span class="sa-fit-fill" style="left:' + pinLeft + '%"></span>' +
-            '</div>' +
-          '</div>' +
-          '<div class="sa-fit-lbls">' + lbls + '</div>' +
           '<div class="sa-fit-ends">' +
             '<span>&larr; ' + esc(t('fit_tighter', 'Ciaśniej')) + '</span>' +
             '<span>' + esc(t('fit_looser', 'Luźniej')) + ' &rarr;</span>' +
           '</div>' +
+          '<div class="sa-fit-tw">' +
+            '<span class="sa-fit-pin" style="left:' + pct + '%">' +
+              '<span class="sa-fit-pin-tag">' + esc(t('fit_you', 'Ty')) + '</span>' +
+            '</span>' +
+            '<div class="sa-fit-track">' + ticks +
+              '<span class="sa-fit-fill" style="width:' + pct + '%"></span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="sa-fit-cells">' + cells + '</div>' +
         '</div>'
       );
     }
