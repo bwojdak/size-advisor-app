@@ -935,9 +935,20 @@
       off = Math.max(-1, Math.min(1, off));
       const pinFrac = (youIdx + 0.5) / n + off * 0.6 * (0.5 / n);
       const pinLeft = (pinFrac * 100).toFixed(1);
+      // Segment rekomendowanego rozmiaru nie jest zamalowany w całości —
+      // wypełniamy go akcentem tylko do pozycji pinezki (0.2–0.8 szerokości),
+      // reszta półprzezroczysta. Widać, czy jesteś przy dolnej, czy górnej
+      // granicy rozmiaru. Solidne tło z CSS zostaje jako fallback.
+      const fillPct = ((0.5 + off * 0.3) * 100).toFixed(1);
+      const youFill =
+        'background:linear-gradient(90deg,' +
+        'var(--sa-accent) 0 ' + fillPct + '%,' +
+        'color-mix(in srgb,var(--sa-accent) 22%,transparent) ' + fillPct + '% 100%)';
       const segs = sizes
         .map((s, i) =>
-          '<span class="sa-fit-seg' + (i === youIdx ? ' sa-fit-seg--you' : '') + '"></span>')
+          i === youIdx
+            ? '<span class="sa-fit-seg sa-fit-seg--you" style="' + youFill + '"></span>'
+            : '<span class="sa-fit-seg"></span>')
         .join('');
       const lbls = sizes
         .map((s, i) =>

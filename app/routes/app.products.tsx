@@ -559,28 +559,39 @@ export default function ProductsConfig() {
                         </Text>
                         <InlineStack gap="150">
                           {rule.sizingSystemId ? (
+                            // Zmapowany na system → własna tabela/zdjęcie/notatki
+                            // produktu są uśpione (silnik bierze dane z systemu),
+                            // więc pokazujemy tylko badge systemu.
                             <Badge tone="info">
                               {t("products.badge.system", {
                                 name:
                                   systemNameById.get(rule.sizingSystemId) ?? "",
                               })}
                             </Badge>
-                          ) : null}
-                          {rule.customNotes ? (
-                            <Badge tone="info">{t("products.badge.notes")}</Badge>
-                          ) : null}
-                          {rule.parsedSizeData ? (
-                            <Badge tone="info">{t("products.badge.sizeTable")}</Badge>
-                          ) : null}
-                          {rule.sizeChartImage ? (
-                            <Badge tone="info">{t("products.badge.image")}</Badge>
-                          ) : null}
-                          {!rule.sizingSystemId &&
-                          !rule.customNotes &&
-                          !rule.parsedSizeData &&
-                          !rule.sizeChartImage ? (
-                            <Badge>{t("products.badge.empty")}</Badge>
-                          ) : null}
+                          ) : (
+                            <>
+                              {rule.customNotes ? (
+                                <Badge tone="info">
+                                  {t("products.badge.notes")}
+                                </Badge>
+                              ) : null}
+                              {rule.parsedSizeData ? (
+                                <Badge tone="info">
+                                  {t("products.badge.sizeTable")}
+                                </Badge>
+                              ) : null}
+                              {rule.sizeChartImage ? (
+                                <Badge tone="info">
+                                  {t("products.badge.image")}
+                                </Badge>
+                              ) : null}
+                              {!rule.customNotes &&
+                              !rule.parsedSizeData &&
+                              !rule.sizeChartImage ? (
+                                <Badge>{t("products.badge.empty")}</Badge>
+                              ) : null}
+                            </>
+                          )}
                           {product?.status && product.status !== "ACTIVE" ? (
                             <Badge tone="warning">{t("products.badge.inactive")}</Badge>
                           ) : null}
