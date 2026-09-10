@@ -249,6 +249,9 @@ export default function SettingsPage() {
   const [testResult, setTestResult] = useState<{
     size: string;
     explanation: string;
+    neighborSmaller: string | null;
+    neighborLarger: string | null;
+    fitOffset: number | null;
     usedBrandStyle: boolean;
     productTitle: string | null;
     usedProductChart: boolean;
@@ -331,6 +334,10 @@ export default function SettingsPage() {
         // Tester pokazuje pełne uzasadnienie na liczbach (do strojenia),
         // nie skrócony nagłówek dla kupującego.
         explanation: json.explanationDetail || json.explanation,
+        neighborSmaller: json.neighborSmaller ?? null,
+        neighborLarger: json.neighborLarger ?? null,
+        fitOffset:
+          typeof json.fitOffset === "number" ? json.fitOffset : null,
         usedBrandStyle: Boolean(json.usedBrandStyle),
         productTitle: json.productTitle ?? null,
         usedProductChart: Boolean(json.usedProductChart),
@@ -837,6 +844,30 @@ export default function SettingsPage() {
                       <Text as="p" variant="bodyMd">
                         {testResult.explanation}
                       </Text>
+                      {testResult.neighborSmaller || testResult.neighborLarger ? (
+                        <BlockStack gap="050">
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            {t("settings.tester.fitScale", {
+                              smaller: testResult.neighborSmaller ?? "—",
+                              size: testResult.size,
+                              larger: testResult.neighborLarger ?? "—",
+                            })}
+                          </Text>
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            {testResult.fitOffset == null
+                              ? t("settings.tester.fitPos.none")
+                              : t("settings.tester.fitPos", {
+                                  v: testResult.fitOffset.toFixed(2),
+                                  dir:
+                                    testResult.fitOffset < -0.1
+                                      ? t("settings.tester.fitPos.smaller")
+                                      : testResult.fitOffset > 0.1
+                                        ? t("settings.tester.fitPos.larger")
+                                        : t("settings.tester.fitPos.mid"),
+                                })}
+                          </Text>
+                        </BlockStack>
+                      ) : null}
                       <InlineStack gap="150" wrap>
                         <Badge tone="info">
                           {testResult.productTitle
