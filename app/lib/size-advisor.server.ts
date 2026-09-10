@@ -263,6 +263,24 @@ function estimateLetterSize(
   return CANON_SIZES[idx];
 }
 
+/** Czy tabela wygląda na boxy/oversize po SAMYCH liczbach — bez płci, do
+ *  klasyfikacji przy ekstrakcji (nie znamy jeszcze sylwetki). Najmniejszy
+ *  rozmiar ma duży bezwzględny obwód klatki ORAZ jest szeroki i krótki
+ *  (obwód:długość). Połówki obwodu (wszystkie < 78) najpierw ×2. */
+function looksBoxyByMeasure(rows: NormalizedSizeRow[]): boolean {
+  const withChest = rows.filter(
+    (r): r is NormalizedSizeRow & { chest: number } =>
+      typeof r.chest === "number" && r.chest > 0,
+  );
+  if (withChest.length < 2) return false;
+  const half = withChest.every((r) => r.chest < 78);
+  const smallest = withChest.reduce((a, b) => (a.chest <= b.chest ? a : b));
+  const minChest = half ? smallest.chest * 2 : smallest.chest;
+  const len = smallest.length;
+  if (typeof len !== "number" || len <= 0) return false;
+  return minChest >= 106 && minChest / len >= 1.58;
+}
+
 /** Te same pasma klatki co w `estimateLetterSize` — wspólne źródło. */
 function chestBands(gender: string): Array<[number, string]> {
   return gender === "female"
@@ -1353,7 +1371,7 @@ function parseExtraction(json: Record<string, unknown>): ChartExtraction {
         : "top";
 
   const luz = String(json.krojLuz ?? json.cut ?? "").toLowerCase();
-  const cut: CutLooseness =
+  let cut: CutLooseness =
     luz === "obcisly" || luz === "slim"
       ? "slim"
       : luz === "swobodny" || luz === "relaxed" || luz === "loose"
@@ -1361,6 +1379,12 @@ function parseExtraction(json: Record<string, unknown>): ChartExtraction {
         : luz === "oversize" || luz === "boxy"
           ? "oversize"
           : "regular";
+  // Nadpisanie z SAMYCH liczb: jeśli AI dało slim/regular, a tabela jest jawnie
+  // szeroka i krótka (boxy) — traktuj jako oversize. Spójne z gradingiem po
+  // długości w resolveSize i z tym, co widzi sprzedawca w panelu.
+  if ((cut === "slim" || cut === "regular") && category === "top" && looksBoxyByMeasure(rows)) {
+    cut = "oversize";
+  }
 
   const korRaw = Number(json.korektaRozmiaru ?? json.korekta ?? 0);
   const korekta: -1 | 0 | 1 = korRaw <= -1 ? -1 : korRaw >= 1 ? 1 : 0;
