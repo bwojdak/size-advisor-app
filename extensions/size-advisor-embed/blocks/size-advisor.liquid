@@ -1,6 +1,6 @@
 {%- liquid
-  assign sa_accent = block.settings.accent | default: '#111111'
-  assign sa_bg = block.settings.bg_color | default: '#111111'
+  assign sa_accent = block.settings.accent | default: '#1a1a1a'
+  assign sa_bg = block.settings.bg_color | default: '#1a1a1a'
   assign sa_fg = block.settings.text_color | default: '#ffffff'
   assign sa_bg_h = block.settings.bg_color_hover
   assign sa_label = block.settings.trigger_label
@@ -26,7 +26,7 @@
     --sa-btn-px: {{ block.settings.padding_x | default: 22 }}px;
     --sa-btn-radius: {{ block.settings.corner_radius | default: 8 }}px;
     --sa-btn-bw: {{ block.settings.border_width | default: 0 }}px;
-    --sa-btn-bc: {{ block.settings.border_color | default: '#111111' }};
+    --sa-btn-bc: {{ block.settings.border_color | default: '#1a1a1a' }};
     --sa-btn-space: {{ block.settings.spacing | default: 15 }}px;
     --sa-btn-justify: {{ sa_align }};
     --sa-btn-w: {{ sa_custom_w }}px;
@@ -181,10 +181,10 @@
     justify-content: center;
     gap: 8px;
     max-width: 100%;
-    background-color: var(--sa-btn-bg, #111);
+    background-color: var(--sa-btn-bg, #1a1a1a);
     color: var(--sa-btn-fg, #fff);
     padding: var(--sa-btn-py, 13px) var(--sa-btn-px, 22px);
-    border: var(--sa-btn-bw, 0px) solid var(--sa-btn-bc, #111);
+    border: var(--sa-btn-bw, 0px) solid var(--sa-btn-bc, #1a1a1a);
     cursor: pointer;
     border-radius: var(--sa-btn-radius, 8px);
     font-family: var(--sa-btn-ff, inherit);
@@ -195,7 +195,7 @@
       background-color 0.16s ease, color 0.16s ease;
   }
   .size-advisor-trigger:hover {
-    background-color: var(--sa-btn-bg-h, var(--sa-btn-bg, #111));
+    background-color: var(--sa-btn-bg-h, var(--sa-btn-bg, #1a1a1a));
   }
   .sa-hover-fade .size-advisor-trigger:hover { opacity: 0.9; }
   .sa-hover-lift .size-advisor-trigger:hover {
@@ -240,7 +240,7 @@
     font: inherit;
     font-size: 12px;
     font-weight: 600;
-    color: var(--sa-accent, #111);
+    color: var(--sa-accent, #1a1a1a);
     text-decoration: underline;
     cursor: pointer;
   }
@@ -1651,7 +1651,7 @@
     { "type": "range", "id": "spacing", "label": "Space above & below", "min": 0, "max": 40, "step": 1, "unit": "px", "default": 15 },
 
     { "type": "header", "content": "Colors" },
-    { "type": "color", "id": "bg_color", "label": "Background", "default": "#111111" },
+    { "type": "color", "id": "bg_color", "label": "Background", "default": "#1a1a1a" },
     { "type": "color", "id": "text_color", "label": "Text", "default": "#ffffff" },
     { "type": "color", "id": "bg_color_hover", "label": "Background on hover", "info": "Optional." },
 
@@ -1686,7 +1686,7 @@
       "type": "color",
       "id": "accent",
       "label": "Accent color",
-      "default": "#111111",
+      "default": "#1a1a1a",
       "info": "Used for the selected options, the result box and the confirm button inside the popup."
     }
   ]
