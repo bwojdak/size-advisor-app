@@ -458,13 +458,38 @@
   }
   .sa-why-detail[hidden] { display: none; }
 
-  /* Skala dopasowania w wyniku: pasek z segmentami na rozmiar + pinezka „Ty"
-     w miejscu rekomendowanego rozmiaru. */
+  /* Skala dopasowania: ciągły tor + krótki „suwak" (pinezka „Ty") wycentrowany
+     pod pozycją kupującego; może zachodzić na sąsiednie rozmiary. */
   .sa-fit-scale { margin-top: 16px; }
-  .sa-fit-pinrow { position: relative; height: 22px; }
+  .sa-fit-tw { position: relative; padding-top: 22px; }
+  .sa-fit-track {
+    position: relative;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--sa-border);
+    overflow: hidden;
+  }
+  .sa-fit-tick {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 2px;
+    transform: translateX(-50%);
+    background: #fff;
+    opacity: 0.75;
+  }
+  .sa-fit-fill {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 42px;
+    transform: translateX(-50%);
+    border-radius: 999px;
+    background: var(--sa-accent);
+  }
   .sa-fit-pin {
     position: absolute;
-    bottom: 0;
+    bottom: 8px;
     transform: translateX(-50%);
     display: flex;
     flex-direction: column;
@@ -492,17 +517,6 @@
     border-right: 5px solid transparent;
     border-top: 5px solid var(--sa-accent);
   }
-  .sa-fit-bar { display: flex; gap: 2px; height: 8px; }
-  .sa-fit-seg { flex: 1; background: var(--sa-border); border-radius: 2px; }
-  .sa-fit-seg:first-child {
-    border-top-left-radius: 999px;
-    border-bottom-left-radius: 999px;
-  }
-  .sa-fit-seg:last-child {
-    border-top-right-radius: 999px;
-    border-bottom-right-radius: 999px;
-  }
-  .sa-fit-seg--you { background: var(--sa-accent); }
   .sa-fit-lbls { display: flex; margin-top: 5px; }
   .sa-fit-lbl {
     flex: 1;
@@ -912,10 +926,10 @@
       resultDiv.innerHTML = html;
     }
 
-    // Skala dopasowania: pasek z jednym segmentem na rozmiar (sąsiedni mniejszy /
-    // rekomendowany / sąsiedni większy) + pinezka „Ty" w segmencie rekomendowanego
-    // rozmiaru, przesunięta wg `fitOffset` ku granicy z sąsiadem, do którego
-    // sylwetce bliżej. Dane z /recommend; chowa się, gdy nie ma żadnego sąsiada.
+    // Skala dopasowania: ciągły tor z podziałką na rozmiary (S / M / L pod spodem)
+    // i krótki „suwak" (pinezka „Ty" + wypełnienie) wycentrowany dokładnie pod
+    // pozycją kupującego — wolno mu zachodzić na sąsiedni rozmiar. `fitOffset`
+    // z /recommend (∈ [-1,1]); chowa się, gdy nie ma żadnego sąsiada.
     function fitScaleHtml(data) {
       const sm = data && data.neighborSmaller;
       const lg = data && data.neighborLarger;
@@ -927,29 +941,21 @@
       if (lg) sizes.push(lg);
       const youIdx = sm ? 1 : 0;
       const n = sizes.length;
-      // `fitOffset` ∈ [-1, 1] z silnika: gdzie w obrębie rozmiaru jest sylwetka
-      // (−1 ku mniejszemu, +1 ku większemu). Przesuwa pinezkę o max 0.6 połowy
-      // segmentu, żeby nigdy nie siadła na samej kresce podziału.
+      // −1 = przy dolnej granicy rozmiaru (ku mniejszemu), +1 = przy górnej.
+      // Suwak jedzie prawie do samej kreski podziału (0.95 połowy segmentu).
       let off = Number(data && data.fitOffset);
       if (!Number.isFinite(off)) off = 0;
       off = Math.max(-1, Math.min(1, off));
-      const pinFrac = (youIdx + 0.5) / n + off * 0.6 * (0.5 / n);
+      let pinFrac = (youIdx + 0.5) / n + off * 0.95 * (0.5 / n);
+      // Trzymaj „Ty" z dala od krawędzi, żeby dymek się nie ucinał.
+      pinFrac = Math.max(0.07, Math.min(0.93, pinFrac));
       const pinLeft = (pinFrac * 100).toFixed(1);
-      // Segment rekomendowanego rozmiaru nie jest zamalowany w całości —
-      // wypełniamy go akcentem tylko do pozycji pinezki (0.2–0.8 szerokości),
-      // reszta półprzezroczysta. Widać, czy jesteś przy dolnej, czy górnej
-      // granicy rozmiaru. Solidne tło z CSS zostaje jako fallback.
-      const fillPct = ((0.5 + off * 0.3) * 100).toFixed(1);
-      const youFill =
-        'background:linear-gradient(90deg,' +
-        'var(--sa-accent) 0 ' + fillPct + '%,' +
-        'color-mix(in srgb,var(--sa-accent) 22%,transparent) ' + fillPct + '% 100%)';
-      const segs = sizes
-        .map((s, i) =>
-          i === youIdx
-            ? '<span class="sa-fit-seg sa-fit-seg--you" style="' + youFill + '"></span>'
-            : '<span class="sa-fit-seg"></span>')
-        .join('');
+      let ticks = '';
+      for (let i = 1; i < n; i++) {
+        ticks +=
+          '<span class="sa-fit-tick" style="left:' +
+          ((i / n) * 100).toFixed(1) + '%"></span>';
+      }
       const lbls = sizes
         .map((s, i) =>
           '<span class="sa-fit-lbl' + (i === youIdx ? ' sa-fit-lbl--you' : '') + '">' +
@@ -957,12 +963,14 @@
         .join('');
       return (
         '<div class="sa-fit-scale">' +
-          '<div class="sa-fit-pinrow">' +
+          '<div class="sa-fit-tw">' +
             '<span class="sa-fit-pin" style="left:' + pinLeft + '%">' +
               '<span class="sa-fit-pin-tag">' + esc(t('fit_you', 'Ty')) + '</span>' +
             '</span>' +
+            '<div class="sa-fit-track">' + ticks +
+              '<span class="sa-fit-fill" style="left:' + pinLeft + '%"></span>' +
+            '</div>' +
           '</div>' +
-          '<div class="sa-fit-bar">' + segs + '</div>' +
           '<div class="sa-fit-lbls">' + lbls + '</div>' +
           '<div class="sa-fit-ends">' +
             '<span>&larr; ' + esc(t('fit_tighter', 'Ciaśniej')) + '</span>' +
