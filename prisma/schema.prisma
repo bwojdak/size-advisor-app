@@ -31,40 +31,44 @@ model Session {
 }
 
 model ShopSettings {
-  id           String        @id @default(uuid())
-  shop         String        @unique
-  plan         String        @default("free")
-  isEnabled    Boolean       @default(true)
-  brandStyle   String        @default("streetwear")
-  aiStyleNotes String?
-  accentColor  String        @default("#000000")
-  language     String        @default("pl")
-  monthlyLimit Int           @default(150)
-  requestsUsed Int           @default(0)
-  usageMonth   String?       // "YYYY-MM" — leniwy reset licznika co miesiąc
-  subscriptionId String?     // gid aktywnej subskrypcji Shopify Billing
-  askFitPreference Boolean   @default(false) // widżet pyta o preferencję dopasowania
-  askGarmentMatch  Boolean   @default(false) // widżet pyta o dobrze leżące ubranie referencyjne
-  widgetLanguage   String    @default("auto") // język widżetu: "auto" (jak sklep) | "pl" | "en"
-  baselineReturnRate Float?  // ogólny wskaźnik zwrotów sklepu (0–1), podany przez merchanta — do liczenia „unikniętych zwrotów"
-  widgetCustomCss  String?   // własny CSS wstrzykiwany do widżetu (Growth+)
-  productRules     ProductRule[]
-  productAnalyses  ProductAnalysis[]
-  sizingSystems    SizingSystem[]
-  advisorLogs      AdvisorLog[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id                 String            @id @default(uuid())
+  shop               String            @unique
+  plan               String            @default("free")
+  isEnabled          Boolean           @default(true)
+  brandStyle         String            @default("streetwear")
+  aiStyleNotes       String?
+  accentColor        String            @default("#000000")
+  language           String            @default("pl")
+  monthlyLimit       Int               @default(150)
+  requestsUsed       Int               @default(0)
+  usageMonth         String? // "YYYY-MM" — leniwy reset licznika co miesiąc
+  subscriptionId     String? // gid aktywnej subskrypcji Shopify Billing
+  askFitPreference   Boolean           @default(false) // widżet pyta o preferencję dopasowania
+  askGarmentMatch    Boolean           @default(false) // widżet pyta o dobrze leżące ubranie referencyjne
+  widgetLanguage     String            @default("auto") // język widżetu: "auto" (jak sklep) | "pl" | "en"
+  baselineReturnRate Float? // ogólny wskaźnik zwrotów sklepu (0–1), podany przez merchanta — do liczenia „unikniętych zwrotów"
+  widgetCustomCss    String? // własny CSS wstrzykiwany do widżetu (Growth+)
+  productRules       ProductRule[]
+  productAnalyses    ProductAnalysis[]
+  sizingSystems      SizingSystem[]
+  advisorLogs        AdvisorLog[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 }
 
 model ProductRule {
-  id             String       @id @default(uuid())
-  shopId         String
-  shop           ShopSettings @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  productId      String       // Shopify Product ID (numeric, np. "8123456789")
-  productTitle   String?      // Cache tytułu do wyświetlania w panelu
-  parsedSizeData String?      // Tabela wymiarów wpisana / wklejona tekstem
-  customNotes    String?      // Notatki dla AI, np. "zaniżona rozmiarówka"
-  sizeChartImage String?      // Zdjęcie rozmiarówki jako data URL (base64)
+  id                 String       @id @default(uuid())
+  shopId             String
+  shop               ShopSettings @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  productId          String // Shopify Product ID (numeric, np. "8123456789")
+  productTitle       String? // Cache tytułu do wyświetlania w panelu
+  parsedSizeData     String? // Tabela wymiarów wpisana / wklejona tekstem
+  // Zweryfikowana przez sprzedawcę siatka wymiarów (JSON: [{size, chest, waist,
+  // hip, length, inseam}]). Gdy ustawiona — to ONA jest źródłem wierszy tabeli,
+  // AI robi tylko klasyfikację (krój, dzianina, kategoria...). Bez halucynacji.
+  structuredSizeData String?
+  customNotes        String? // Notatki dla AI, np. "zaniżona rozmiarówka"
+  sizeChartImage     String? // Zdjęcie rozmiarówki jako data URL (base64)
 
   // Zamiast własnej tabeli produkt może wskazywać na współdzielony system
   // rozmiarów (np. "Standardowe t-shirty"). Wtedy pola tabeli powyżej są
@@ -75,14 +79,14 @@ model ProductRule {
   // Jednorazowa analiza produktu przez AI (config-time). Przy zapytaniu klienta
   // używamy jej bez wołania modelu; przeliczamy tylko gdy zmieni się tabela /
   // opis / styl marki albo wzrośnie EXTRACTION_VERSION.
-  extractionJson    String?   // surowy JSON modelu (ChartExtraction źródłowy)
+  extractionJson    String? // surowy JSON modelu (ChartExtraction źródłowy)
   extractionAt      DateTime?
   extractionModel   String?
   extractionVersion Int?
-  extractionError   String?   // ostatni błąd analizy (nie blokuje zapisu reguły)
+  extractionError   String? // ostatni błąd analizy (nie blokuje zapisu reguły)
 
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([shopId, productId])
 }
@@ -95,8 +99,8 @@ model ProductAnalysis {
   id                String       @id @default(uuid())
   shopId            String
   shop              ShopSettings @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  productId         String       // Shopify Product ID (numeryczne)
-  extractionJson    String       // surowy JSON modelu (ChartExtraction źródłowy)
+  productId         String // Shopify Product ID (numeryczne)
+  extractionJson    String // surowy JSON modelu (ChartExtraction źródłowy)
   extractionModel   String?
   extractionVersion Int
   analyzedAt        DateTime     @default(now())
@@ -107,22 +111,23 @@ model ProductAnalysis {
 // Współdzielona, nazwana rozmiarówka (np. "Standardowe t-shirty", "Bluzy boxy").
 // Jeden system → wiele produktów. Analiza AI robiona raz na system, nie na produkt.
 model SizingSystem {
-  id                String       @id @default(uuid())
-  shopId            String
-  shop              ShopSettings @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  name              String
-  parsedSizeData    String?      // Tabela wymiarów wklejona tekstem
-  customNotes       String?      // Notatki dla AI dotyczące tego systemu
+  id                 String       @id @default(uuid())
+  shopId             String
+  shop               ShopSettings @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name               String
+  parsedSizeData     String? // Tabela wymiarów wklejona tekstem
+  structuredSizeData String? // Zweryfikowana siatka wymiarów (JSON) — patrz ProductRule
+  customNotes        String? // Notatki dla AI dotyczące tego systemu
 
-  extractionJson    String?      // surowy JSON modelu (ChartExtraction źródłowy)
+  extractionJson    String? // surowy JSON modelu (ChartExtraction źródłowy)
   extractionAt      DateTime?
   extractionModel   String?
   extractionVersion Int?
   extractionError   String?
 
-  rules             ProductRule[]
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  rules     ProductRule[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
   @@unique([shopId, name])
 }
@@ -140,7 +145,7 @@ model AdvisorLog {
   addedToCart     Boolean      @default(false)
   purchased       Boolean      @default(false)
   orderId         String?
-  orderTotal      Float?       // wartość zamówienia z webhooka orders/create
+  orderTotal      Float? // wartość zamówienia z webhooka orders/create
   orderCurrency   String?
   purchasedAt     DateTime?
   returned        Boolean      @default(false) // zamówienie zwrócone (refunds/create)

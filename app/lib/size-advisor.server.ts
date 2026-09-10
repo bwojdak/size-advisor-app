@@ -1287,6 +1287,9 @@ export type AICallInput = {
   model: string;
   prompt: string;
   sizeChartImage?: string | null;
+  /** Zweryfikowana siatka wymiarów sprzedawcy (JSON). Gdy podana, nadpisuje
+   *  wiersze z ekstrakcji AI — model służy tylko do klasyfikacji. */
+  structuredSizeData?: string | null;
   decision: {
     height: number | string;
     weight: number | string;
@@ -1549,7 +1552,10 @@ export async function callAI(input: AICallInput): Promise<AICallResult> {
       ? await callGeminiRaw(input)
       : await callOpenAIRaw(input);
 
-  const extraction = parseExtraction(raw.json);
+  const extraction = applyStructuredRows(
+    parseExtraction(raw.json),
+    input.structuredSizeData,
+  );
   const decided = decideSize(extraction, input.decision);
 
   return {
@@ -1624,6 +1630,59 @@ export function parseStoredExtraction(json: string | null | undefined): ChartExt
   } catch {
     return null;
   }
+}
+
+/** Parsuje zweryfikowaną przez sprzedawcę siatkę wymiarów (JSON z panelu).
+ *  Zwraca uporządkowane wiersze albo null, gdy nie ma sensownych danych. */
+export function parseStructuredRows(
+  json: string | null | undefined,
+): NormalizedSizeRow[] | null {
+  if (!json) return null;
+  let arr: unknown;
+  try {
+    arr = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(arr)) return null;
+  const num = (v: unknown) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 && n < 400 ? Math.round(n * 10) / 10 : null;
+  };
+  const rows: NormalizedSizeRow[] = [];
+  for (const r of arr) {
+    if (!r || typeof r !== "object") continue;
+    const o = r as Record<string, unknown>;
+    const size = String(o.size ?? o.rozmiar ?? "").trim();
+    if (!size) continue;
+    const row: NormalizedSizeRow = {
+      size,
+      chest: num(o.chest),
+      waist: num(o.waist),
+      hip: num(o.hip),
+      length: num(o.length),
+      inseam: num(o.inseam),
+    };
+    if (row.chest || row.waist || row.hip || row.length || row.inseam) {
+      rows.push(row);
+    }
+  }
+  return rows.length >= 2 ? rows : null;
+}
+
+/** Domyślna ekstrakcja (regular / góra, brak wierszy) — baza klasyfikacji, gdy
+ *  jest siatka sprzedawcy, ale nie ma zapisanej analizy AI. */
+export const emptyExtraction = (): ChartExtraction =>
+  parseExtraction({});
+
+/** Gdy sprzedawca zweryfikował siatkę wymiarów — to ona jest źródłem wierszy;
+ *  z ekstrakcji AI zostaje tylko klasyfikacja (krój, dzianina, kategoria...). */
+export function applyStructuredRows(
+  extraction: ChartExtraction,
+  structuredJson: string | null | undefined,
+): ChartExtraction {
+  const rows = parseStructuredRows(structuredJson);
+  return rows ? { ...extraction, rows } : extraction;
 }
 
 /** Zwięzły, czytelny dla admina opis tego, co model zrozumiał z produktu. */

@@ -6,6 +6,9 @@ import {
   callAI,
   decideSize,
   parseStoredExtraction,
+  parseStructuredRows,
+  applyStructuredRows,
+  emptyExtraction,
   EXTRACTION_VERSION,
   getAIConfig,
   AIQuotaError,
@@ -284,6 +287,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const chartNotes = sizingSystem
       ? sizingSystem.customNotes
       : (productRule?.customNotes ?? null);
+    // Zweryfikowana siatka wymiarów (panel) — gdy jest, to ona daje wiersze
+    // tabeli, a AI tylko klasyfikuje. Zero błędów odczytu.
+    const chartStructured = sizingSystem
+      ? sizingSystem.structuredSizeData
+      : (productRule?.structuredSizeData ?? null);
 
     // Cache analizy dla produktów, których admin nie skonfigurował ręcznie.
     const productAnalysis =
@@ -342,6 +350,33 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalNbLarger = cached.nbLarger;
       finalFitScale = cached.fitScale;
       finalSource = cached.source;
+    } else if (chartStructured && parseStructuredRows(chartStructured)) {
+      // Siatka wymiarów zweryfikowana przez sprzedawcę → wiersze bierzemy z niej,
+      // klasyfikacja z zapisanej analizy AI (jeśli aktualna), inaczej domyślna.
+      // Zero wołania modelu, zero błędów odczytu tabeli.
+      const cls =
+        chartJson && chartVersion === EXTRACTION_VERSION
+          ? parseStoredExtraction(chartJson)
+          : null;
+      const stored = applyStructuredRows(cls ?? emptyExtraction(), chartStructured);
+      const decided = decideSize(stored, decision);
+      finalSize = decided.size;
+      finalExplanation = decided.explanation;
+      finalDetail = decided.explanationDetail;
+      finalNbSmaller = decided.neighborSmaller;
+      finalNbLarger = decided.neighborLarger;
+      finalFitScale = decided.fitScale;
+      finalSource = decided.source;
+      setCachedRecommendation(
+        cacheKey,
+        finalSize,
+        finalExplanation,
+        finalDetail,
+        finalNbSmaller,
+        finalNbLarger,
+        finalFitScale,
+        finalSource,
+      );
     } else if (
       // Gotowa analiza produktu z konfiguracji → decyzja bez wołania AI.
       // Ubranie referencyjne dopasowujemy deterministycznie (na liczbach), więc
@@ -424,6 +459,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           model,
           prompt,
           sizeChartImage: useImage ? productRule?.sizeChartImage : null,
+          structuredSizeData: chartStructured,
           decision,
         });
       } catch (err) {

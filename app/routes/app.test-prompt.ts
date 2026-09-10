@@ -77,13 +77,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   let productDescription: string | null = null;
   let productRule: {
     parsedSizeData: string | null;
+    structuredSizeData: string | null;
     customNotes: string | null;
     sizeChartImage: string | null;
     sizingSystemId: string | null;
   } | null = null;
   // Produkt zmapowany na współdzielony system → silnik (i tester) czyta tabelę
   // z SYSTEMU, nie z własnej (uśpionej) tabeli produktu.
-  let sizingSystem: { name: string; parsedSizeData: string | null; customNotes: string | null } | null = null;
+  let sizingSystem: {
+    name: string;
+    parsedSizeData: string | null;
+    structuredSizeData: string | null;
+    customNotes: string | null;
+  } | null = null;
 
   if (numericProductId) {
     const [gqlResp, rule] = await Promise.all([
@@ -106,7 +112,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (rule?.sizingSystemId) {
       sizingSystem = await db.sizingSystem.findUnique({
         where: { id: rule.sizingSystemId },
-        select: { name: true, parsedSizeData: true, customNotes: true },
+        select: {
+          name: true,
+          parsedSizeData: true,
+          structuredSizeData: true,
+          customNotes: true,
+        },
       });
     }
   }
@@ -118,6 +129,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const chartNotes = sizingSystem
     ? sizingSystem.customNotes
     : productRule?.customNotes;
+  const chartStructured = sizingSystem
+    ? sizingSystem.structuredSizeData
+    : (productRule?.structuredSizeData ?? null);
 
   const adminLocale =
     normalizeLocale(new URL(request.url).searchParams.get("locale")) ?? "pl";
@@ -146,6 +160,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       model,
       prompt,
       sizeChartImage: useImage ? productRule?.sizeChartImage : null,
+      structuredSizeData: chartStructured,
       decision: {
         height,
         weight,
