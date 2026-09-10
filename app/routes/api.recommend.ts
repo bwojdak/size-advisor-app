@@ -33,6 +33,7 @@ const recommendationCache = new Map<
     nbSmaller: string | null;
     nbLarger: string | null;
     fitScale: FitScale | null;
+    source: "chart" | "estimate";
     ts: number;
   }
 >();
@@ -55,6 +56,7 @@ function setCachedRecommendation(
   nbSmaller: string | null,
   nbLarger: string | null,
   fitScale: FitScale | null,
+  source: "chart" | "estimate",
 ) {
   if (recommendationCache.size >= CACHE_MAX) {
     const oldest = recommendationCache.keys().next().value;
@@ -67,6 +69,7 @@ function setCachedRecommendation(
     nbSmaller,
     nbLarger,
     fitScale,
+    source,
     ts: Date.now(),
   });
 }
@@ -304,6 +307,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     let finalNbSmaller: string | null = null;
     let finalNbLarger: string | null = null;
     let finalFitScale: FitScale | null = null;
+    let finalSource: "chart" | "estimate" = "estimate";
 
     const decision = {
       height,
@@ -324,6 +328,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalNbSmaller = cached.nbSmaller;
       finalNbLarger = cached.nbLarger;
       finalFitScale = cached.fitScale;
+      finalSource = cached.source;
     } else if (
       // Gotowa analiza produktu z konfiguracji → decyzja bez wołania AI.
       // Pomijamy, gdy klient podał ubranie referencyjne (potrzebny świeży
@@ -341,6 +346,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalNbSmaller = decided.neighborSmaller;
       finalNbLarger = decided.neighborLarger;
       finalFitScale = decided.fitScale;
+      finalSource = decided.source;
       setCachedRecommendation(
         cacheKey,
         finalSize,
@@ -349,6 +355,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         finalNbSmaller,
         finalNbLarger,
         finalFitScale,
+        finalSource,
       );
     } else if (
       // Cache analizy produktu niekonfigurowanego → decyzja bez wołania AI.
@@ -366,6 +373,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalNbSmaller = decided.neighborSmaller;
       finalNbLarger = decided.neighborLarger;
       finalFitScale = decided.fitScale;
+      finalSource = decided.source;
       setCachedRecommendation(
         cacheKey,
         finalSize,
@@ -374,6 +382,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         finalNbSmaller,
         finalNbLarger,
         finalFitScale,
+        finalSource,
       );
     } else {
       // Zdjęcie rozmiarówki tylko w planach z multimodalnym AI i tylko dla
@@ -444,6 +453,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalNbSmaller = result.neighborSmaller;
       finalNbLarger = result.neighborLarger;
       finalFitScale = result.fitScale;
+      finalSource = result.source;
       setCachedRecommendation(
         cacheKey,
         finalSize,
@@ -452,6 +462,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         finalNbSmaller,
         finalNbLarger,
         finalFitScale,
+        finalSource,
       );
 
       // Zapisz świeżą analizę produktu, żeby kolejne zapytania (tego i innych
@@ -542,6 +553,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       neighborSmaller: finalNbSmaller,
       neighborLarger: finalNbLarger,
       fitScale: finalFitScale,
+      // "chart" = policzone z prawdziwej tabeli/analizy produktu; "estimate" =
+      // zgrubny szacunek z samej sylwetki (brak rozmiarówki / produkt nieodzieżowy).
+      source: finalSource,
     });
   } catch (error) {
     console.error("Endpoint Handler Error:", error);

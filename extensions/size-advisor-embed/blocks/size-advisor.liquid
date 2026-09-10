@@ -1376,12 +1376,15 @@
             showResult(data);
             lastCalcKey = calcKey; // zapamiętaj — powtórka z tymi samymi danymi nie wyśle zapytania
             // Zapamiętaj profil + wynik: kolejne produkty pokażą „Mój rozmiar".
+            // Pasek tylko dla produktów z prawdziwą rozmiarówką (source=chart).
             if (!refBrand && !refSize) {
               const prof = { g: gender, h: height, w: weight, bt: bodyType, fp: fitPreference || '' };
               saveProfile(prof);
               saveSize(prof, data);
-              try { sessionStorage.removeItem('sa-mysize-x'); } catch (e) {}
-              renderMySize(data.size);
+              if (data.source === 'chart') {
+                try { sessionStorage.removeItem('sa-mysize-x'); } catch (e) {}
+                renderMySize(data.size);
+              }
             }
           }
         } catch (err) {
@@ -1400,7 +1403,7 @@
     // brak cache + plan z `autoSize` = jedno ciche przeliczenie dla tego produktu.
     const SA_PID = String({{ product.id | json }} == null ? '' : {{ product.id | json }}).replace(/\D/g, '');
     const PROFILE_KEY = 'sa-profile';
-    const SIZES_KEY = 'sa-sizes';
+    const SIZES_KEY = 'sa-sizes-v2'; // v2: wpisy niosą source ('chart'/'na')
     const SIZE_TTL = 1000 * 60 * 60 * 24 * 30;
 
     function readJSON(key) {
@@ -1425,22 +1428,31 @@
       const all = readJSON(SIZES_KEY) || {};
       const hit = all[SA_PID];
       if (!hit || hit.ph !== profileHash(p) || Date.now() - (hit.ts || 0) > SIZE_TTL) return null;
-      return hit;
+      return hit; // { na: true } = produkt bez rozmiarówki → paska nie pokazujemy
     }
-    function saveSize(p, data) {
-      if (!SA_PID || !data || !data.size) return;
+    function putSize(p, entry) {
+      if (!SA_PID) return;
       const all = readJSON(SIZES_KEY) || {};
-      all[SA_PID] = {
-        size: data.size,
-        neighborSmaller: data.neighborSmaller || null,
-        neighborLarger: data.neighborLarger || null,
-        fitScale: data.fitScale || null,
-        ph: profileHash(p),
-        ts: Date.now(),
-      };
+      all[SA_PID] = Object.assign({ ph: profileHash(p), ts: Date.now() }, entry);
       const keys = Object.keys(all);
       if (keys.length > 60) delete all[keys[0]];
       writeJSON(SIZES_KEY, all);
+    }
+    // Zapisujemy „prawdziwy" wynik tylko gdy policzony z tabeli/analizy produktu.
+    // Sam szacunek z sylwetki (brak rozmiarówki / produkt nieodzieżowy, np. wosk
+    // do nart) → wpis „na", żeby pasek się nie pokazywał i nie wołać co wejście.
+    function saveSize(p, data) {
+      if (!data || !data.size) return;
+      if (data.source === 'chart') {
+        putSize(p, {
+          size: data.size,
+          neighborSmaller: data.neighborSmaller || null,
+          neighborLarger: data.neighborLarger || null,
+          fitScale: data.fitScale || null,
+        });
+      } else {
+        putSize(p, { na: true });
+      }
     }
 
     function setPill(groupId, value) {
@@ -1498,10 +1510,11 @@
           body: payload,
         });
         const data = await res.json();
-        if (data && data.size && !data.error) {
+        if (data && data.size && !data.error && data.source === 'chart') {
           saveSize(p, data);
           renderMySize(data.size);
         } else {
+          if (data && !data.error) saveSize(p, data); // zapamiętaj „na"
           restoreTrigger();
         }
       } catch (e) {
@@ -1519,9 +1532,9 @@
         applyProfile(profile);
         if (!dismissed && SA_PID) {
           const hit = cachedSize(profile);
-          if (hit) {
+          if (hit && !hit.na) {
             renderMySize(hit.size);
-          } else if (autoSize) {
+          } else if (!hit && autoSize) {
             renderMySize('…'); // od razu chowamy przycisk, wypełnimy po odpowiedzi
             autoRecommend(profile);
           }
@@ -1531,7 +1544,7 @@
       const openIt = () => {
         const p = getProfile();
         const hit = p && cachedSize(p);
-        if (hit) {
+        if (hit && !hit.na && hit.size) {
           applyProfile(p);
           showResult({
             size: hit.size,
