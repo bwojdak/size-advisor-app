@@ -4,7 +4,7 @@
   assign sa_fg = block.settings.text_color | default: '#ffffff'
   assign sa_bg_h = block.settings.bg_color_hover
   assign sa_label = block.settings.trigger_label
-  assign sa_width = block.settings.button_width | default: 'full'
+  assign sa_width = block.settings.button_width | default: 'inline'
   assign sa_hover = block.settings.hover_effect | default: 'fade'
   assign sa_align = block.settings.button_align | default: 'flex-start'
   assign sa_custom_w = block.settings.custom_width | default: 0
@@ -1605,7 +1605,7 @@
         { "value": "full", "label": "Full width" },
         { "value": "inline", "label": "Fit content" }
       ],
-      "default": "full"
+      "default": "inline"
     },
     {
       "type": "range",
