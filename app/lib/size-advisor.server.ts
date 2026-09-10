@@ -401,6 +401,9 @@ type ResolveInput = {
   allowKorekta: boolean;
   /** Dobrze leżące ubranie referencyjne podane przez klienta (marka + rozmiar). */
   referenceGarment?: { brand: string; size: string } | null;
+  /** Wewnętrzne: głębokość rekurencji strażnika monotoniczności (patrz koniec
+   *  resolveSize). Nie ustawiać z zewnątrz. */
+  guardDepth?: number;
 };
 
 export type ResolveResult = {
@@ -993,6 +996,33 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
     }
   }
 
+  // --- Strażnik monotoniczności wzrostu (tylko „dołki") -------------------
+  // Usuwamy NIEMONOTONICZNOŚĆ: gdy przy tej samej wadze/budowie/fasonie
+  // sylwetka 4 cm niższa I 4 cm wyższa dostają rozmiar NIE MNIEJSZY, a bieżąca
+  // mniejszy — to artefakt granicy pasma / progu sita, nie realna zależność.
+  // Podnosimy wtedy bieżący wybór do mniejszego z sąsiadów. Monotoniczny spadek
+  // rozmiaru ze wzrostem (wyższy = szczuplejszy przy tej samej wadze) zostaje.
+  {
+    const depth = input.guardDepth ?? 0;
+    if (depth === 0 && height - 4 >= 140 && height + 4 <= 230) {
+      const lo = resolveSize({ ...input, height: height - 4, guardDepth: 1 });
+      const hi = resolveSize({ ...input, height: height + 4, guardDepth: 1 });
+      const iAt = (s: string | undefined) =>
+        s ? rows.findIndex((r) => normSize(r.size) === normSize(s)) : -1;
+      const iNow = iAt(chosen.size);
+      const iLo = iAt(lo?.size);
+      const iHi = iAt(hi?.size);
+      if (iNow >= 0 && iLo >= 0 && iHi >= 0 && iNow < iLo && iNow < iHi) {
+        const to = Math.min(iLo, iHi);
+        console.warn(
+          "[resolveSize] strażnik monotoniczności — dołek rozmiaru, podniesiono",
+          { from: chosen.size, to: rows[to].size, height },
+        );
+        chosen = rows[to];
+      }
+    }
+  }
+
   const finalPrimary = useWaist ? chosen.waist : chosen.chest;
 
   // Suwak dla widżetu: interpoluj `scaleTarget` (idealny wymiar dla sylwetki,
@@ -1391,6 +1421,18 @@ export function decideSize(
     height > 0
       ? estimateLetterSize(height, weight, gender, bodyType, fit, extraction.category)
       : (extraction.fallbackSize || "M").toUpperCase().replace(/\s+/g, "");
+
+  // Strażnik monotoniczności (tylko „dołki", jak w resolveSize): jeśli sylwetka
+  // 4 cm niższa i 4 cm wyższa dają rozmiar nie mniejszy, a bieżąca mniejszy —
+  // podnieś do mniejszego z sąsiadów.
+  if (height - 4 >= 140) {
+    const args = [weight, gender, bodyType, fit, extraction.category] as const;
+    const lo = estimateLetterSize(height - 4, ...args);
+    const hi = estimateLetterSize(height + 4, ...args);
+    if (sizeIndex(size) < sizeIndex(lo) && sizeIndex(size) < sizeIndex(hi)) {
+      size = sizeIndex(lo) <= sizeIndex(hi) ? lo : hi;
+    }
+  }
 
   // Jeśli model zwrócił choćby same etykiety rozmiarów (bez wymiarów), nie
   // wychodzimy poza ten zakres — inaczej padało „3XL" dla produktu, który

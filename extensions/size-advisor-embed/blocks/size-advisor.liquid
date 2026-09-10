@@ -438,25 +438,6 @@
   }
   .sa-result--ok .sa-result-size { font-size: 16px; font-weight: 700; }
   .sa-result--ok .sa-result-why { color: #4b5563; font-size: 13px; margin-top: 5px; display: block; }
-  .sa-why-toggle {
-    margin-top: 8px;
-    padding: 0;
-    background: none;
-    border: none;
-    color: var(--sa-accent, #4b5563);
-    font: inherit;
-    font-size: 12px;
-    text-decoration: underline;
-    cursor: pointer;
-  }
-  .sa-why-detail {
-    display: block;
-    margin-top: 6px;
-    color: var(--sa-muted, #6b7280);
-    font-size: 12px;
-    line-height: 1.5;
-  }
-  .sa-why-detail[hidden] { display: none; }
 
   /* Skala dopasowania = progress bar: tor z wypełnieniem rosnącym do pinezki
      „Ty", pod spodem stałe komórki rozmiarów. Pozycja z `fitScale.pos` (silnik
@@ -1262,34 +1243,14 @@
           if (data.error) {
             setResult('err', esc(data.error));
           } else {
+            // Kupujący widzi tylko krótki, pewny nagłówek — bez centymetrów,
+            // wyliczeń i zastrzeżeń (pełny szczegół zostaje w testerze w panelu).
             const headline = esc(data.explanation || '');
-            const detail = String(data.explanationDetail || '');
-            const hasDetail = detail && detail !== (data.explanation || '');
             let html =
               '<span class="sa-result-size">' + esc(withSize(I18N.result_size, data.size)) + '</span>' +
               '<span class="sa-result-why">' + headline + '</span>';
-            if (hasDetail) {
-              html +=
-                '<button type="button" class="sa-why-toggle" aria-expanded="false">' +
-                esc(I18N.why || 'Why this size?') + '</button>' +
-                '<span class="sa-why-detail" hidden>' + esc(detail) + '</span>';
-            }
             html += fitScaleHtml(data);
             setResult('ok', html);
-            if (hasDetail) {
-              const tg = resultDiv.querySelector('.sa-why-toggle');
-              const dt = resultDiv.querySelector('.sa-why-detail');
-              if (tg && dt) {
-                tg.addEventListener('click', () => {
-                  const open = dt.hidden;
-                  dt.hidden = !open;
-                  tg.setAttribute('aria-expanded', open ? 'true' : 'false');
-                  tg.textContent = open
-                    ? (I18N.why_hide || 'Hide')
-                    : (I18N.why || 'Why this size?');
-                });
-              }
-            }
             if (allowAddToCart) renderCartAction(data.size, data.logId);
             lastCalcKey = calcKey; // zapamiętaj — powtórka z tymi samymi danymi nie wyśle zapytania
           }
