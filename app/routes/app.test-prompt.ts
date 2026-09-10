@@ -65,7 +65,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     parsedSizeData: string | null;
     customNotes: string | null;
     sizeChartImage: string | null;
+    sizingSystemId: string | null;
   } | null = null;
+  // Produkt zmapowany na współdzielony system → silnik (i tester) czyta tabelę
+  // z SYSTEMU, nie z własnej (uśpionej) tabeli produktu.
+  let sizingSystem: { name: string; parsedSizeData: string | null; customNotes: string | null } | null = null;
 
   if (numericProductId) {
     const [gqlResp, rule] = await Promise.all([
@@ -84,23 +88,40 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     productTitle = gql?.data?.product?.title ?? null;
     productDescription = gql?.data?.product?.description ?? null;
     productRule = rule;
+
+    if (rule?.sizingSystemId) {
+      sizingSystem = await db.sizingSystem.findUnique({
+        where: { id: rule.sizingSystemId },
+        select: { name: true, parsedSizeData: true, customNotes: true },
+      });
+    }
   }
+
+  // Źródło tabeli i notatek: system (jeśli przypięty) albo własna tabela produktu.
+  const chartSizeData = sizingSystem
+    ? sizingSystem.parsedSizeData
+    : productRule?.parsedSizeData;
+  const chartNotes = sizingSystem
+    ? sizingSystem.customNotes
+    : productRule?.customNotes;
 
   const adminLocale =
     normalizeLocale(new URL(request.url).searchParams.get("locale")) ?? "pl";
 
-  const useImage = caps.sizeChartImageAI && Boolean(productRule?.sizeChartImage);
+  // Zdjęcie rozmiarówki tylko dla produktu z własną tabelą (system jest tekstowy).
+  const useImage =
+    caps.sizeChartImageAI && !sizingSystem && Boolean(productRule?.sizeChartImage);
 
   const prompt = buildSizeAdvisorPrompt({
-    productTitle,
-    productDescription,
+    productTitle: sizingSystem ? "" : productTitle,
+    productDescription: sizingSystem ? "" : productDescription,
     gender: body.gender,
     height,
     weight,
     bodyType: body.bodyType,
     brandStyleNotes: settings?.aiStyleNotes ?? null,
-    productSizeData: productRule?.parsedSizeData,
-    productNotes: productRule?.customNotes,
+    productSizeData: chartSizeData,
+    productNotes: chartNotes,
     hasSizeChartImage: useImage,
     fitPreference: fit,
     referenceGarment,
@@ -120,7 +141,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         fit,
         locale: adminLocale,
         allowKorekta: Boolean(
-          settings?.aiStyleNotes?.trim() || productRule?.customNotes?.trim(),
+          settings?.aiStyleNotes?.trim() || chartNotes?.trim(),
         ),
         referenceGarment,
       },
@@ -134,7 +155,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       fitScale: result.fitScale,
       usedBrandStyle: Boolean(settings?.aiStyleNotes?.trim()),
       productTitle,
-      usedProductChart: Boolean(productRule?.parsedSizeData?.trim() || useImage),
+      sizingSystemName: sizingSystem?.name ?? null,
+      usedProductChart: Boolean(chartSizeData?.trim() || useImage),
       promptTokenCount: result.promptTokenCount,
     });
   } catch (err) {

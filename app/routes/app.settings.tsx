@@ -252,6 +252,7 @@ export default function SettingsPage() {
     fitScale: { labels: string[]; pos: number; recIndex: number } | null;
     usedBrandStyle: boolean;
     productTitle: string | null;
+    sizingSystemName: string | null;
     usedProductChart: boolean;
   } | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
@@ -338,6 +339,7 @@ export default function SettingsPage() {
             : null,
         usedBrandStyle: Boolean(json.usedBrandStyle),
         productTitle: json.productTitle ?? null,
+        sizingSystemName: json.sizingSystemName ?? null,
         usedProductChart: Boolean(json.usedProductChart),
       });
     } catch (err) {
@@ -871,6 +873,13 @@ export default function SettingsPage() {
                             {testResult.usedProductChart
                               ? t("settings.tester.withChart")
                               : t("settings.tester.noChart")}
+                          </Badge>
+                        ) : null}
+                        {testResult.sizingSystemName ? (
+                          <Badge tone="info">
+                            {t("settings.tester.viaSystem", {
+                              name: testResult.sizingSystemName,
+                            })}
                           </Badge>
                         ) : null}
                         <Badge
