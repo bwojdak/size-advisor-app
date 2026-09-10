@@ -224,11 +224,11 @@
   .size-advisor-modal-content {
     background: #fff;
     color: var(--sa-ink, #14161c);
-    padding: 28px 26px 24px;
-    border-radius: clamp(14px, calc(var(--sa-btn-radius, 8px) + 10px), 26px);
-    max-width: 452px;
+    padding: 22px 20px 18px;
+    border-radius: clamp(12px, calc(var(--sa-btn-radius, 8px) + 8px), 22px);
+    max-width: 356px;
     width: 100%;
-    max-height: 92vh;
+    max-height: 90vh;
     overflow-y: auto;
     position: relative;
     box-shadow: var(--sa-shadow);
@@ -285,32 +285,32 @@
   .sa-lang-code { line-height: 1; }
 
   .size-advisor-title {
-    margin: 0 44px 6px 0;
-    font-size: 22px;
+    margin: 0 40px 5px 0;
+    font-size: 19px;
     font-weight: 800;
     letter-spacing: -0.015em;
     line-height: 1.2;
   }
-  .size-advisor-desc { margin: 0 0 20px 0; font-size: 13px; color: var(--sa-muted); line-height: 1.5; }
+  .size-advisor-desc { margin: 0 0 14px 0; font-size: 12px; color: var(--sa-muted); line-height: 1.45; }
 
   .sa-label {
     display: block;
-    margin: 18px 0 7px 0;
-    font-size: 10.5px;
+    margin: 13px 0 5px 0;
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.7px;
+    letter-spacing: 0.6px;
     color: #7a828f;
   }
-  .size-advisor-form > .sa-label:first-child { margin-top: 4px; }
+  .size-advisor-form > .sa-label:first-child { margin-top: 2px; }
 
-  .sa-pill-group { display: grid; gap: 7px; }
+  .sa-pill-group { display: grid; gap: 5px; }
   .sa-pill-group--2 { grid-template-columns: repeat(2, 1fr); }
   .sa-pill-group--3 { grid-template-columns: repeat(3, 1fr); }
 
   .sa-pill-btn {
-    padding: 11px 8px;
-    font-size: 13px;
+    padding: 9px 6px;
+    font-size: 12px;
     font-weight: 600;
     border: 1px solid var(--sa-border);
     background: var(--sa-bg-tint);
@@ -334,7 +334,7 @@
     box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--sa-accent) 55%, transparent);
   }
 
-  .sa-grid-inputs { display: flex; gap: 12px; }
+  .sa-grid-inputs { display: flex; gap: 10px; }
   .sa-input-col { flex: 1; }
 
   .sa-field-head {
@@ -342,7 +342,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    margin: 14px 0 6px;
+    margin: 11px 0 5px;
   }
   .sa-field-head .sa-label { margin: 0; }
   .sa-unit-toggle {
@@ -370,8 +370,8 @@
   .sa-unit-toggle button.active { background: var(--sa-accent); color: #fff; }
   .sa-input-col input {
     width: 100%;
-    padding: 12px 13px;
-    font-size: 15px;
+    padding: 10px 11px;
+    font-size: 14px;
     font-weight: 500;
     border: 1px solid var(--sa-border);
     border-radius: var(--sa-radius);
@@ -387,7 +387,7 @@
     box-shadow: 0 0 0 3px var(--sa-focus, rgba(17,19,24,0.08));
   }
 
-  #sa-garment-wrap { margin-top: 14px; }
+  #sa-garment-wrap { margin-top: 11px; }
   .sa-garment-toggle {
     border: none;
     background: transparent;
@@ -413,8 +413,8 @@
   #get-recommendation-btn {
     position: relative;
     width: 100%;
-    padding: 14px;
-    margin-top: 22px;
+    padding: 12px;
+    margin-top: 16px;
     background: var(--sa-accent);
     color: #fff;
     border: none;
@@ -449,8 +449,8 @@
   @keyframes sa-spin { to { transform: rotate(360deg); } }
 
   .sa-result {
-    margin-top: 20px;
-    padding: 18px 18px 16px;
+    margin-top: 14px;
+    padding: 14px 14px 13px;
     border-radius: clamp(10px, var(--sa-radius), 18px);
     background: linear-gradient(180deg, color-mix(in srgb, var(--sa-accent) 6%, #fff), var(--sa-bg-soft));
     border: 1px solid color-mix(in srgb, var(--sa-accent) 18%, var(--sa-border));
@@ -477,7 +477,7 @@
   }
   .sa-result--ok .sa-result-size {
     display: block;
-    font-size: 19px;
+    font-size: 16px;
     font-weight: 800;
     letter-spacing: -0.01em;
     color: var(--sa-ink);
@@ -486,18 +486,18 @@
   /* Skala dopasowania = progress bar: tor z wypełnieniem rosnącym do pinezki
      „Ty", pod spodem stałe komórki rozmiarów. Pozycja z `fitScale.pos` (silnik
      interpoluje ją płynnie, więc pinezka nie przeskakuje przy zmianie rozmiaru). */
-  .sa-fit-scale { margin-top: 18px; }
+  .sa-fit-scale { margin-top: 13px; }
   .sa-fit-ends {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 7px;
     font-size: 9.5px;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: #9aa1ac;
   }
-  .sa-fit-tw { position: relative; padding-top: 26px; }
+  .sa-fit-tw { position: relative; padding-top: 22px; }
   .sa-fit-track {
     position: relative;
     height: 8px;
@@ -564,15 +564,15 @@
     border-right: 5px solid transparent;
     border-top: 6px solid var(--sa-accent);
   }
-  .sa-fit-cells { display: flex; gap: 6px; margin-top: 10px; }
+  .sa-fit-cells { display: flex; gap: 5px; margin-top: 8px; }
   .sa-fit-cell {
     flex: 1;
     text-align: center;
-    padding: 8px 4px;
+    padding: 6px 4px;
     border: 1px solid var(--sa-border);
     border-radius: var(--sa-radius);
     background: var(--sa-bg-tint);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: #9aa1ac;
     transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
@@ -592,7 +592,7 @@
   }
   @keyframes sa-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-  .sa-cart-action { margin-top: 14px; animation: sa-cart-in 0.28s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+  .sa-cart-action { margin-top: 11px; animation: sa-cart-in 0.28s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
   @keyframes sa-cart-in { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: none; } }
   .sa-add-to-cart {
     position: relative;
@@ -643,18 +643,18 @@
   .sa-cart-done a { display: inline-block; margin-top: 4px; font-weight: 600; color: var(--sa-accent); }
 
   .sa-powered-by {
-    margin: 14px 0 0 0;
+    margin: 11px 0 0 0;
     text-align: center;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 600;
     color: #b6bcc6;
-    letter-spacing: 1.2px;
+    letter-spacing: 1.1px;
     text-transform: uppercase;
   }
 
   @media (max-width: 400px) {
-    .size-advisor-modal-content { padding: 22px 18px; }
-    .sa-pill-btn { padding: 10px 4px; font-size: 12px; }
+    .size-advisor-modal-content { padding: 18px 15px; }
+    .sa-pill-btn { padding: 9px 3px; font-size: 11px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
