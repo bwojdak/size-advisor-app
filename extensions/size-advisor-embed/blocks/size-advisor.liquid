@@ -913,9 +913,9 @@
     }
 
     // Skala dopasowania: pasek z jednym segmentem na rozmiar (sąsiedni mniejszy /
-    // rekomendowany / sąsiedni większy) + pinezka „Ty" na środku segmentu z
-    // rekomendowanym rozmiarem — pokazuje, gdzie na skali jest kupujący.
-    // Sąsiedzi przychodzą z /recommend; chowa się, gdy nie ma żadnego.
+    // rekomendowany / sąsiedni większy) + pinezka „Ty" w segmencie rekomendowanego
+    // rozmiaru, przesunięta wg `fitOffset` ku granicy z sąsiadem, do którego
+    // sylwetce bliżej. Dane z /recommend; chowa się, gdy nie ma żadnego sąsiada.
     function fitScaleHtml(data) {
       const sm = data && data.neighborSmaller;
       const lg = data && data.neighborLarger;
@@ -926,7 +926,15 @@
       sizes.push(mid);
       if (lg) sizes.push(lg);
       const youIdx = sm ? 1 : 0;
-      const pinLeft = (((youIdx + 0.5) / sizes.length) * 100).toFixed(1);
+      const n = sizes.length;
+      // `fitOffset` ∈ [-1, 1] z silnika: gdzie w obrębie rozmiaru jest sylwetka
+      // (−1 ku mniejszemu, +1 ku większemu). Przesuwa pinezkę o max 0.6 połowy
+      // segmentu, żeby nigdy nie siadła na samej kresce podziału.
+      let off = Number(data && data.fitOffset);
+      if (!Number.isFinite(off)) off = 0;
+      off = Math.max(-1, Math.min(1, off));
+      const pinFrac = (youIdx + 0.5) / n + off * 0.6 * (0.5 / n);
+      const pinLeft = (pinFrac * 100).toFixed(1);
       const segs = sizes
         .map((s, i) =>
           '<span class="sa-fit-seg' + (i === youIdx ? ' sa-fit-seg--you' : '') + '"></span>')

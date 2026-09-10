@@ -31,6 +31,7 @@ const recommendationCache = new Map<
     detail: string;
     nbSmaller: string | null;
     nbLarger: string | null;
+    fitOffset: number | null;
     ts: number;
   }
 >();
@@ -52,6 +53,7 @@ function setCachedRecommendation(
   detail: string,
   nbSmaller: string | null,
   nbLarger: string | null,
+  fitOffset: number | null,
 ) {
   if (recommendationCache.size >= CACHE_MAX) {
     const oldest = recommendationCache.keys().next().value;
@@ -63,6 +65,7 @@ function setCachedRecommendation(
     detail,
     nbSmaller,
     nbLarger,
+    fitOffset,
     ts: Date.now(),
   });
 }
@@ -299,6 +302,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     let finalDetail: string;
     let finalNbSmaller: string | null = null;
     let finalNbLarger: string | null = null;
+    let finalFitOffset: number | null = null;
 
     const decision = {
       height,
@@ -318,6 +322,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalDetail = cached.detail;
       finalNbSmaller = cached.nbSmaller;
       finalNbLarger = cached.nbLarger;
+      finalFitOffset = cached.fitOffset;
     } else if (
       // Gotowa analiza produktu z konfiguracji → decyzja bez wołania AI.
       // Pomijamy, gdy klient podał ubranie referencyjne (potrzebny świeży
@@ -334,6 +339,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalDetail = decided.explanationDetail;
       finalNbSmaller = decided.neighborSmaller;
       finalNbLarger = decided.neighborLarger;
+      finalFitOffset = decided.fitOffset;
       setCachedRecommendation(
         cacheKey,
         finalSize,
@@ -341,6 +347,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         finalDetail,
         finalNbSmaller,
         finalNbLarger,
+        finalFitOffset,
       );
     } else if (
       // Cache analizy produktu niekonfigurowanego → decyzja bez wołania AI.
@@ -357,6 +364,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalDetail = decided.explanationDetail;
       finalNbSmaller = decided.neighborSmaller;
       finalNbLarger = decided.neighborLarger;
+      finalFitOffset = decided.fitOffset;
       setCachedRecommendation(
         cacheKey,
         finalSize,
@@ -364,6 +372,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         finalDetail,
         finalNbSmaller,
         finalNbLarger,
+        finalFitOffset,
       );
     } else {
       // Zdjęcie rozmiarówki tylko w planach z multimodalnym AI i tylko dla
@@ -433,6 +442,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalDetail = result.explanationDetail;
       finalNbSmaller = result.neighborSmaller;
       finalNbLarger = result.neighborLarger;
+      finalFitOffset = result.fitOffset;
       setCachedRecommendation(
         cacheKey,
         finalSize,
@@ -440,6 +450,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         finalDetail,
         finalNbSmaller,
         finalNbLarger,
+        finalFitOffset,
       );
 
       // Zapisz świeżą analizę produktu, żeby kolejne zapytania (tego i innych
@@ -524,6 +535,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       explanationDetail: finalDetail,
       neighborSmaller: finalNbSmaller,
       neighborLarger: finalNbLarger,
+      fitOffset: finalFitOffset,
     });
   } catch (error) {
     console.error("Endpoint Handler Error:", error);

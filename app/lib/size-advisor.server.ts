@@ -398,6 +398,11 @@ export type ResolveResult = {
   /** Sąsiednie rozmiary z tabeli — do suwaka „ciaśniej ← Ty → luźniej". */
   neighborSmaller: string | null;
   neighborLarger: string | null;
+  /** Pozycja ciała W OBRĘBIE wybranego rozmiaru, do przesunięcia pinezki na
+   *  suwaku. Zakres [-1, 1]: -1 = przy dolnej granicy (ku mniejszemu sąsiadowi),
+   *  0 = środek, +1 = przy górnej granicy (ku większemu). null = nie policzono
+   *  (tryb bez wymiarów: ubranie referencyjne, oszacowanie bez tabeli). */
+  fitOffset: number | null;
 };
 
 const normSize = (s: string) => s.toUpperCase().replace(/\s+/g, "");
@@ -632,6 +637,7 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
         modelRef: null,
         matchedReference: input.referenceGarment,
         ...neighborLabels(rows, chosen.size),
+        fitOffset: null,
       };
     }
   }
@@ -895,6 +901,42 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
   }
 
   const finalPrimary = useWaist ? chosen.waist : chosen.chest;
+
+  // Pozycja ciała w obrębie wybranego rozmiaru — jak daleko `target` (idealny
+  // wymiar dla tej sylwetki) leży od wartości wybranego rozmiaru, w skali do
+  // POŁOWY odstępu do sąsiada po tej stronie. Wynik [-1, 1] przesuwa pinezkę
+  // na suwaku: >0 = bliżej większego rozmiaru, <0 = bliżej mniejszego.
+  let fitOffset: number | null = null;
+  {
+    const ci = rows.findIndex((r) => normSize(r.size) === normSize(chosen.size));
+    const chosenVal = valueOf(chosen);
+    if (
+      ci >= 0 &&
+      Number.isFinite(chosenVal) &&
+      chosenVal > 0 &&
+      Number.isFinite(target)
+    ) {
+      const delta = target - chosenVal; // + = sylwetka większa niż ten rozmiar
+      const upVal = ci < rows.length - 1 ? valueOf(rows[ci + 1]) : NaN;
+      const downVal = ci > 0 ? valueOf(rows[ci - 1]) : NaN;
+      const gapUp =
+        Number.isFinite(upVal) && upVal > chosenVal ? upVal - chosenVal : NaN;
+      const gapDown =
+        Number.isFinite(downVal) && downVal > 0 && downVal < chosenVal
+          ? chosenVal - downVal
+          : NaN;
+      if (Math.abs(delta) < 0.05) {
+        fitOffset = 0;
+      } else if (delta > 0 && Number.isFinite(gapUp)) {
+        fitOffset = clamp(delta / (gapUp / 2), 0, 1);
+      } else if (delta < 0 && Number.isFinite(gapDown)) {
+        fitOffset = -clamp(-delta / (gapDown / 2), 0, 1);
+      } else {
+        fitOffset = 0;
+      }
+    }
+  }
+
   return {
     size: chosen.size.toUpperCase().replace(/\s+/g, ""),
     mode,
@@ -913,6 +955,7 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
         : null,
     matchedReference: null,
     ...neighborLabels(rows, chosen.size),
+    fitOffset,
   };
 }
 
@@ -1121,6 +1164,8 @@ export type AICallResult = {
   /** Sąsiednie rozmiary — do suwaka „ciaśniej ← Ty → luźniej" w widżecie. */
   neighborSmaller: string | null;
   neighborLarger: string | null;
+  /** Pozycja pinezki w obrębie rozmiaru na suwaku: [-1, 1] lub null. */
+  fitOffset: number | null;
   attachedImage: boolean;
   promptTokenCount: number | null;
   candidatesTokenCount: number | null;
@@ -1269,6 +1314,7 @@ export function decideSize(
       source: "chart",
       neighborSmaller: resolved.neighborSmaller,
       neighborLarger: resolved.neighborLarger,
+      fitOffset: resolved.fitOffset,
     };
   }
 
@@ -1317,6 +1363,7 @@ export function decideSize(
     source: "estimate",
     neighborSmaller: estSmaller,
     neighborLarger: estLarger,
+    fitOffset: null,
   };
 }
 
