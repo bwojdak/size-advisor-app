@@ -458,34 +458,64 @@
   }
   .sa-why-detail[hidden] { display: none; }
 
-  /* Skala dopasowania w wyniku: Ciaśniej ← Ty → Luźniej */
-  .sa-fit-scale { margin-top: 12px; }
-  .sa-fit-cells { display: flex; gap: 6px; }
-  .sa-fit-cell {
+  /* Skala dopasowania w wyniku: pasek z segmentami na rozmiar + pinezka „Ty"
+     w miejscu rekomendowanego rozmiaru. */
+  .sa-fit-scale { margin-top: 16px; }
+  .sa-fit-pinrow { position: relative; height: 22px; }
+  .sa-fit-pin {
+    position: absolute;
+    bottom: 0;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+  }
+  .sa-fit-pin-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #fff;
+    background: var(--sa-accent);
+    border-radius: 999px;
+    padding: 2px 7px;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+  .sa-fit-pin::after {
+    content: "";
+    width: 0;
+    height: 0;
+    margin-top: 1px;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid var(--sa-accent);
+  }
+  .sa-fit-bar { display: flex; gap: 2px; height: 8px; }
+  .sa-fit-seg { flex: 1; background: var(--sa-border); border-radius: 2px; }
+  .sa-fit-seg:first-child {
+    border-top-left-radius: 999px;
+    border-bottom-left-radius: 999px;
+  }
+  .sa-fit-seg:last-child {
+    border-top-right-radius: 999px;
+    border-bottom-right-radius: 999px;
+  }
+  .sa-fit-seg--you { background: var(--sa-accent); }
+  .sa-fit-lbls { display: flex; margin-top: 5px; }
+  .sa-fit-lbl {
     flex: 1;
     text-align: center;
-    padding: 7px 4px;
-    border: 1px solid var(--sa-border);
-    border-radius: var(--sa-radius);
-    background: #fff;
-    line-height: 1.2;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sa-muted);
   }
-  .sa-fit-cell--you { background: var(--sa-accent); border-color: var(--sa-accent); }
-  .sa-fit-sz { display: block; font-size: 13px; font-weight: 700; color: #1f2430; }
-  .sa-fit-cell--you .sa-fit-sz { color: #fff; }
-  .sa-fit-tag {
-    display: block;
-    margin-top: 2px;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.85);
-  }
+  .sa-fit-lbl--you { color: #1f2430; font-weight: 700; }
   .sa-fit-ends {
     display: flex;
     justify-content: space-between;
-    margin-top: 5px;
+    margin-top: 4px;
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -882,25 +912,39 @@
       resultDiv.innerHTML = html;
     }
 
-    // Skala „Ciaśniej ← Ty → Luźniej" z sąsiadującymi rozmiarami zwróconymi
-    // przez /recommend. Czysty render — chowa się, gdy nie ma żadnego sąsiada.
+    // Skala dopasowania: pasek z jednym segmentem na rozmiar (sąsiedni mniejszy /
+    // rekomendowany / sąsiedni większy) + pinezka „Ty" na środku segmentu z
+    // rekomendowanym rozmiarem — pokazuje, gdzie na skali jest kupujący.
+    // Sąsiedzi przychodzą z /recommend; chowa się, gdy nie ma żadnego.
     function fitScaleHtml(data) {
       const sm = data && data.neighborSmaller;
       const lg = data && data.neighborLarger;
       const mid = data && data.size;
       if (!sm && !lg) return '';
-      const cell = (label, you) =>
-        '<div class="sa-fit-cell' + (you ? ' sa-fit-cell--you' : '') + '">' +
-          '<span class="sa-fit-sz">' + esc(label) + '</span>' +
-          (you ? '<span class="sa-fit-tag">' + esc(t('fit_you', 'Ty')) + '</span>' : '') +
-        '</div>';
-      let cells = '';
-      if (sm) cells += cell(sm, false);
-      cells += cell(mid, true);
-      if (lg) cells += cell(lg, false);
+      const sizes = [];
+      if (sm) sizes.push(sm);
+      sizes.push(mid);
+      if (lg) sizes.push(lg);
+      const youIdx = sm ? 1 : 0;
+      const pinLeft = (((youIdx + 0.5) / sizes.length) * 100).toFixed(1);
+      const segs = sizes
+        .map((s, i) =>
+          '<span class="sa-fit-seg' + (i === youIdx ? ' sa-fit-seg--you' : '') + '"></span>')
+        .join('');
+      const lbls = sizes
+        .map((s, i) =>
+          '<span class="sa-fit-lbl' + (i === youIdx ? ' sa-fit-lbl--you' : '') + '">' +
+          esc(s) + '</span>')
+        .join('');
       return (
         '<div class="sa-fit-scale">' +
-          '<div class="sa-fit-cells">' + cells + '</div>' +
+          '<div class="sa-fit-pinrow">' +
+            '<span class="sa-fit-pin" style="left:' + pinLeft + '%">' +
+              '<span class="sa-fit-pin-tag">' + esc(t('fit_you', 'Ty')) + '</span>' +
+            '</span>' +
+          '</div>' +
+          '<div class="sa-fit-bar">' + segs + '</div>' +
+          '<div class="sa-fit-lbls">' + lbls + '</div>' +
           '<div class="sa-fit-ends">' +
             '<span>&larr; ' + esc(t('fit_tighter', 'Ciaśniej')) + '</span>' +
             '<span>' + esc(t('fit_looser', 'Luźniej')) + ' &rarr;</span>' +
