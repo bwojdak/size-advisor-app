@@ -63,6 +63,9 @@ export type PlanCapabilities = {
   bulkImport: boolean;
   /** Widżet: pytanie „mam dobrze leżące ubranie marki X rozmiar Y". */
   garmentMatch: boolean;
+  /** Widżet: po jednorazowym podaniu wymiarów kupujący widzi „Mój rozmiar: X"
+   *  na każdym produkcie bez ponownego wypełniania (auto-przeliczenie). */
+  autoSize: boolean;
 };
 
 export const PLAN_CAPS: Record<string, PlanCapabilities> = {
@@ -81,6 +84,7 @@ export const PLAN_CAPS: Record<string, PlanCapabilities> = {
     customCss: false,
     bulkImport: false,
     garmentMatch: false,
+    autoSize: false,
   },
   [PLAN.STARTER]: {
     monthlyLimit: 500,
@@ -97,6 +101,7 @@ export const PLAN_CAPS: Record<string, PlanCapabilities> = {
     customCss: false,
     bulkImport: false,
     garmentMatch: false,
+    autoSize: false,
   },
   [PLAN.GROWTH]: {
     monthlyLimit: 3000,
@@ -113,6 +118,7 @@ export const PLAN_CAPS: Record<string, PlanCapabilities> = {
     customCss: true,
     bulkImport: false,
     garmentMatch: true,
+    autoSize: true,
   },
   [PLAN.PRO]: {
     monthlyLimit: 15000,
@@ -129,6 +135,7 @@ export const PLAN_CAPS: Record<string, PlanCapabilities> = {
     customCss: true,
     bulkImport: true,
     garmentMatch: true,
+    autoSize: true,
   },
 };
 
@@ -169,6 +176,7 @@ export const PLAN_FEATURES: Record<string, string[]> = {
     "plans.feat.revenue",
     "plans.feat.fit_pref",
     "plans.feat.garment_match",
+    "plans.feat.auto_size",
     "plans.feat.custom_css",
     "plans.feat.no_branding",
     "plans.feat.history_year",

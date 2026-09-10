@@ -38,6 +38,8 @@
     "err_connection": "Błąd połączenia z serwerem.",
     "result_size": "Rekomendowany rozmiar: [size]",
     "cart_best": "Twój najlepszy rozmiar: [size]",
+    "mysize": "Mój rozmiar",
+    "mysize_more": "Szczegóły",
     "why": "Dlaczego ten rozmiar?",
     "why_hide": "Ukryj szczegóły",
     "add_to_cart": "Dodaj rozmiar [size] do koszyka",

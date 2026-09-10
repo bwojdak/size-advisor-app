@@ -524,10 +524,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       },
     });
 
-    await db.shopSettings.update({
-      where: { id: settings.id },
-      data: { requestsUsed: { increment: 1 } },
-    });
+    // Trafienie w cache (ta sama sylwetka + produkt) nie kosztuje AI ani realnego
+    // obliczenia — nie liczymy go do miesięcznego limitu. Dzięki temu funkcja
+    // „Mój rozmiar" (przeglądanie znanych już produktów) nie zjada limitu sklepu.
+    if (!cached) {
+      await db.shopSettings.update({
+        where: { id: settings.id },
+        data: { requestsUsed: { increment: 1 } },
+      });
+    }
 
     return data({
       logId: log.id,

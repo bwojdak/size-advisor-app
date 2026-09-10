@@ -31,6 +31,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       poweredBy: !caps.removeBranding,
       fitPreference: Boolean(settings?.askFitPreference && caps.fitPreference),
       garmentMatch: Boolean(settings?.askGarmentMatch && caps.garmentMatch),
+      // „Mój rozmiar: X" bez ponownego wypełniania — auto-przeliczenie dla
+      // nowych produktów tylko na planach z tą funkcją (patrz planCaps).
+      autoSize: caps.autoSize,
       // Efektywny domyślny język widżetu: wybór admina dla widżetu, a przy
       // "auto" — język ustawiony dla aplikacji (ten sam, którego api.recommend
       // używa dla odpowiedzi na planach bez wielojęzyczności). Dzięki temu

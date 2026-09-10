@@ -39,6 +39,12 @@
       {% endif %}
       <span>{% if sa_label != blank %}{{ sa_label }}{% else %}{{ 'size_advisor.trigger' | t }}{% endif %}</span>
     </button>
+    <div class="sa-mysize" id="sa-mysize" hidden>
+      <span class="sa-mysize-badge" aria-hidden="true">{{ block.settings.icon_char | default: '📏' }}</span>
+      <span class="sa-mysize-text"><span data-i18n="mysize">{{ 'size_advisor.mysize' | t }}</span>: <b class="sa-mysize-val"></b></span>
+      <button type="button" class="sa-mysize-more" id="sa-mysize-more" data-i18n="mysize_more">{{ 'size_advisor.mysize_more' | t }}</button>
+      <button type="button" class="sa-mysize-x" id="sa-mysize-x" data-i18n-aria="close" aria-label="{{ 'size_advisor.close' | t }}">&times;</button>
+    </div>
   </div>
 
   <div
@@ -199,6 +205,56 @@
   .sa-hover-shadow .size-advisor-trigger:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.22); }
   .size-advisor-trigger:active { transform: translateY(1px); }
   .sa-trigger-icon { font-size: 1.05em; }
+
+  /* Pasek „Mój rozmiar: X" — zamiast przycisku, gdy kupujący ma zapisany profil. */
+  .sa-mysize {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    max-width: 100%;
+    padding: 9px 12px;
+    background: #fff;
+    border: 1px solid var(--sa-border, #e3e5ea);
+    border-radius: var(--sa-btn-radius, 8px);
+    font-family: var(--sa-btn-ff, inherit);
+    font-size: 13px;
+    color: var(--sa-ink, #14161c);
+    box-shadow: 0 2px 10px -4px rgba(16, 18, 26, 0.16);
+  }
+  .sa-root:not(.sa-fixed-w).sa-w-full .sa-mysize { width: 100%; }
+  .sa-fixed-w .sa-mysize { width: var(--sa-btn-w); }
+  .sa-mysize-badge { font-size: 15px; line-height: 1; flex: none; }
+  .sa-mysize-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sa-mysize-val { font-weight: 800; }
+  .sa-mysize-more {
+    flex: none;
+    border: 0;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sa-accent, #111);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .sa-mysize-x {
+    flex: none;
+    border: 0;
+    background: none;
+    padding: 0 2px;
+    font-size: 18px;
+    line-height: 1;
+    color: #9aa1ac;
+    cursor: pointer;
+  }
+  .sa-mysize-x:hover { color: var(--sa-ink, #14161c); }
 
   .size-advisor-modal {
     position: fixed;
@@ -673,6 +729,8 @@
     err_connection: {{ 'size_advisor.err_connection' | t | json }},
     result_size: {{ 'size_advisor.result_size' | t | json }},
     cart_best: {{ 'size_advisor.cart_best' | t | json }},
+    mysize: {{ 'size_advisor.mysize' | t | json }},
+    mysize_more: {{ 'size_advisor.mysize_more' | t | json }},
     why: {{ 'size_advisor.why' | t | json }},
     why_hide: {{ 'size_advisor.why_hide' | t | json }},
     add_to_cart: {{ 'size_advisor.add_to_cart' | t | json }},
@@ -732,6 +790,8 @@
       err_connection: "Błąd połączenia z serwerem.",
       result_size: "Rekomendowany rozmiar: [size]",
       cart_best: "Twój najlepszy rozmiar: [size]",
+      mysize: "Mój rozmiar",
+      mysize_more: "Szczegóły",
       why: "Dlaczego ten rozmiar?",
       why_hide: "Ukryj szczegóły",
       add_to_cart: "Dodaj rozmiar [size] do koszyka",
@@ -781,6 +841,8 @@
       err_connection: "Server connection error.",
       result_size: "Recommended size: [size]",
       cart_best: "Your best size: [size]",
+      mysize: "My size",
+      mysize_more: "Details",
       why: "Why this size?",
       why_hide: "Hide details",
       add_to_cart: "Add size [size] to cart",
@@ -858,6 +920,7 @@
     let allowAddToCart = false;
     let askFitPref = false;
     let askGarment = false;
+    let autoSize = false;
     // Ostatnie policzone dane — powtórne „Oblicz" z tymi samymi wartościami, gdy
     // wynik już jest na ekranie, nie wysyła kolejnego zapytania.
     let lastCalcKey = null;
@@ -870,6 +933,7 @@
       }
 
       allowAddToCart = statusData.addToCart === true;
+      autoSize = statusData.autoSize === true;
       askFitPref = statusData.fitPreference === true;
       if (askFitPref) {
         const fw = document.getElementById('sa-fit-wrap');
@@ -972,6 +1036,17 @@
       resultDiv.hidden = false;
       resultDiv.className = 'sa-result' + (state ? ' sa-result--' + state : '');
       resultDiv.innerHTML = html;
+    }
+
+    // Wspólny render wyniku „OK" — używa go i przycisk „Oblicz", i pasek
+    // „Mój rozmiar" (gdy wynik jest w cache). `data.logId` bywa puste (cache).
+    function showResult(data) {
+      let html =
+        '<span class="sa-result-size">' +
+        esc(withSize(I18N.result_size, data.size)) + '</span>';
+      html += fitScaleHtml(data);
+      setResult('ok', html);
+      if (allowAddToCart) renderCartAction(data.size, data.logId);
     }
 
     // Skala dopasowania = progress bar. `data.fitScale` z /recommend niesie
@@ -1298,13 +1373,16 @@
           } else {
             // Kupujący widzi tylko rozmiar + suwak dopasowania — bez zdań
             // opisowych, centymetrów i zastrzeżeń (szczegół zostaje w testerze).
-            let html =
-              '<span class="sa-result-size">' +
-              esc(withSize(I18N.result_size, data.size)) + '</span>';
-            html += fitScaleHtml(data);
-            setResult('ok', html);
-            if (allowAddToCart) renderCartAction(data.size, data.logId);
+            showResult(data);
             lastCalcKey = calcKey; // zapamiętaj — powtórka z tymi samymi danymi nie wyśle zapytania
+            // Zapamiętaj profil + wynik: kolejne produkty pokażą „Mój rozmiar".
+            if (!refBrand && !refSize) {
+              const prof = { g: gender, h: height, w: weight, bt: bodyType, fp: fitPreference || '' };
+              saveProfile(prof);
+              saveSize(prof, data);
+              try { sessionStorage.removeItem('sa-mysize-x'); } catch (e) {}
+              renderMySize(data.size);
+            }
           }
         } catch (err) {
           setResult('err', I18N.err_connection);
@@ -1315,6 +1393,169 @@
         }
       });
     }
+
+    // ================= „Mój rozmiar: X" =================================
+    // Profil (wymiary) i wynik per produkt trzymamy w localStorage. Gdy profil
+    // istnieje: pokazujemy pasek zamiast przycisku. Wynik z cache = zero zapytań;
+    // brak cache + plan z `autoSize` = jedno ciche przeliczenie dla tego produktu.
+    const SA_PID = String({{ product.id | json }} == null ? '' : {{ product.id | json }}).replace(/\D/g, '');
+    const PROFILE_KEY = 'sa-profile';
+    const SIZES_KEY = 'sa-sizes';
+    const SIZE_TTL = 1000 * 60 * 60 * 24 * 30;
+
+    function readJSON(key) {
+      try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { return null; }
+    }
+    function writeJSON(key, val) {
+      try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+    }
+    function profileHash(p) {
+      return [p.g, p.h, p.w, p.bt, p.fp || '', saLang].join('|');
+    }
+    function getProfile() {
+      const p = readJSON(PROFILE_KEY);
+      if (!p || !(Number(p.h) > 0) || !(Number(p.w) > 0)) return null;
+      return p;
+    }
+    function saveProfile(p) {
+      writeJSON(PROFILE_KEY, { g: p.g, h: p.h, w: p.w, bt: p.bt, fp: p.fp || '', ver: 1 });
+    }
+    function cachedSize(p) {
+      if (!SA_PID) return null;
+      const all = readJSON(SIZES_KEY) || {};
+      const hit = all[SA_PID];
+      if (!hit || hit.ph !== profileHash(p) || Date.now() - (hit.ts || 0) > SIZE_TTL) return null;
+      return hit;
+    }
+    function saveSize(p, data) {
+      if (!SA_PID || !data || !data.size) return;
+      const all = readJSON(SIZES_KEY) || {};
+      all[SA_PID] = {
+        size: data.size,
+        neighborSmaller: data.neighborSmaller || null,
+        neighborLarger: data.neighborLarger || null,
+        fitScale: data.fitScale || null,
+        ph: profileHash(p),
+        ts: Date.now(),
+      };
+      const keys = Object.keys(all);
+      if (keys.length > 60) delete all[keys[0]];
+      writeJSON(SIZES_KEY, all);
+    }
+
+    function setPill(groupId, value) {
+      const g = document.getElementById(groupId);
+      if (!g || !value) return;
+      g.querySelectorAll('.sa-pill-btn').forEach((b) => {
+        const on = b.dataset.value === value;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+    function applyProfile(p) {
+      setPill('sa-gender-group', p.g);
+      setPill('sa-body-group', p.bt);
+      if (askFitPref && p.fp) setPill('sa-fit-group', p.fp);
+      const hEl = document.getElementById('user-height');
+      const wEl = document.getElementById('user-weight');
+      if (hEl) hEl.value = hUnit === 'in' ? Math.round(Number(p.h) / IN_PER_CM) : p.h;
+      if (wEl) wEl.value = wUnit === 'lb' ? Math.round(Number(p.w) / LB_PER_KG) : p.w;
+    }
+
+    const myPill = document.getElementById('sa-mysize');
+    function renderMySize(size) {
+      if (!myPill || !size) return;
+      const val = myPill.querySelector('.sa-mysize-val');
+      if (val) val.textContent = size;
+      myPill.hidden = false;
+      if (btn) btn.hidden = true;
+      container.hidden = false;
+    }
+
+    function restoreTrigger() {
+      if (myPill) myPill.hidden = true;
+      if (btn) btn.hidden = false;
+    }
+
+    async function autoRecommend(p) {
+      try {
+        const payload = JSON.stringify({
+          height: Number(p.h),
+          weight: Number(p.w),
+          gender: p.g,
+          bodyType: p.bt,
+          fitPreference: askFitPref ? (p.fp || 'regular') : '',
+          refBrand: '',
+          refSize: '',
+          locale: saLang || window.__SA_LOCALE || 'en',
+          productId: {{ product.id | json }},
+          productTitle: {{ product.title | default: "" | json }},
+          productDescription: {{ product.description | strip_html | json }}
+        });
+        const res = await fetch('/apps/size-advisor/recommend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: payload,
+        });
+        const data = await res.json();
+        if (data && data.size && !data.error) {
+          saveSize(p, data);
+          renderMySize(data.size);
+        } else {
+          restoreTrigger();
+        }
+      } catch (e) {
+        restoreTrigger(); // cicho — zostaje zwykły przycisk
+      }
+    }
+
+    (function initMySize() {
+      if (!myPill) return;
+      const profile = getProfile();
+      let dismissed = false;
+      try { dismissed = sessionStorage.getItem('sa-mysize-x') === '1'; } catch (e) {}
+
+      if (profile) {
+        applyProfile(profile);
+        if (!dismissed && SA_PID) {
+          const hit = cachedSize(profile);
+          if (hit) {
+            renderMySize(hit.size);
+          } else if (autoSize) {
+            renderMySize('…'); // od razu chowamy przycisk, wypełnimy po odpowiedzi
+            autoRecommend(profile);
+          }
+        }
+      }
+
+      const openIt = () => {
+        const p = getProfile();
+        const hit = p && cachedSize(p);
+        if (hit) {
+          applyProfile(p);
+          showResult({
+            size: hit.size,
+            neighborSmaller: hit.neighborSmaller,
+            neighborLarger: hit.neighborLarger,
+            fitScale: hit.fitScale,
+          });
+        }
+        openModal();
+      };
+      const moreBtn = document.getElementById('sa-mysize-more');
+      const xBtn = document.getElementById('sa-mysize-x');
+      myPill.addEventListener('click', (e) => {
+        if (e.target === xBtn || e.target === moreBtn) return;
+        openIt();
+      });
+      if (moreBtn) moreBtn.addEventListener('click', openIt);
+      if (xBtn) xBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        myPill.hidden = true;
+        if (btn) btn.hidden = false;
+        try { sessionStorage.setItem('sa-mysize-x', '1'); } catch (er) {}
+      });
+    })();
   }
 
   if (document.readyState === 'loading') {

@@ -38,6 +38,8 @@
     "err_connection": "Server connection error.",
     "result_size": "Recommended size: [size]",
     "cart_best": "Your best size: [size]",
+    "mysize": "My size",
+    "mysize_more": "Details",
     "why": "Why this size?",
     "why_hide": "Hide details",
     "add_to_cart": "Add size [size] to cart",
