@@ -1676,6 +1676,27 @@ export function parseStructuredRows(
   return rows.length >= 2 ? rows : null;
 }
 
+/** Zamienia zweryfikowaną siatkę z powrotem na tekstową tabelę do promptu
+ *  ekstrakcyjnego (pole `productSizeData` w `buildSizeAdvisorPrompt`) — żeby
+ *  AI miało czym ocenić "krojLuz" (patrz prompt: "oceń PRZEDE WSZYSTKIM z
+ *  wymiarów tabeli, nie z nazwy"), zamiast zgadywać wyłącznie z nazwy
+ *  produktu/systemu, gdy nie ma zdjęcia ani notatek. AI i tak nie decyduje o
+ *  rozmiarze — jego "tabela" w odpowiedzi jest ignorowana, bo `resolveSize`
+ *  dostaje liczby z tej samej siatki przez `applyStructuredRows`. */
+export function structuredRowsAsPromptText(rows: NormalizedSizeRow[]): string {
+  return rows
+    .map((r) => {
+      const dims: string[] = [];
+      if (r.chest != null) dims.push(`klatka ${r.chest}`);
+      if (r.waist != null) dims.push(`pas ${r.waist}`);
+      if (r.hip != null) dims.push(`biodra ${r.hip}`);
+      if (r.length != null) dims.push(`długość ${r.length}`);
+      if (r.inseam != null) dims.push(`nogawka ${r.inseam}`);
+      return `Rozmiar ${r.size}: ${dims.join(", ")}`;
+    })
+    .join("\n");
+}
+
 /** Domyślna ekstrakcja (regular / góra, brak wierszy) — baza klasyfikacji, gdy
  *  jest siatka sprzedawcy, ale nie ma zapisanej analizy AI. */
 export const emptyExtraction = (): ChartExtraction =>

@@ -10,6 +10,7 @@ import {
   getAIConfig,
   EXTRACTION_VERSION,
   parseStructuredRows,
+  structuredRowsAsPromptText,
 } from "../lib/size-advisor.server";
 
 const MAX_IMAGE_CHARS = 3_600_000;
@@ -22,6 +23,7 @@ type RuleRow = {
   parsedSizeData: string | null;
   customNotes: string | null;
   sizeChartImage: string | null;
+  structuredSizeData: string | null;
 };
 
 // Jednorazowa analiza produktu przez AI. Robimy ją przy zapisie / na żądanie,
@@ -63,12 +65,17 @@ async function runExtraction(
       productDescription,
       brandStyleNotes: opts.brandStyleNotes,
       // `parsedSizeData` (stare pole "Opis dla AI" z wklejoną tabelą) nie ma
-      // już swojego pola w edytorze — zastąpiła je zweryfikowana siatka +
-      // "Notatki dla AI". Kolumna w bazie zostaje (nie kasujemy cudzych
-      // danych bez pytania), ale przestajemy ją wysyłać do analizy: inaczej
-      // stara, niewidoczna i niemożliwa do wyczyszczenia wartość sprzed tej
-      // zmiany wpływałaby na wynik "Przeanalizuj ponownie" w nieskończoność.
-      productSizeData: null,
+      // już swojego pola w edytorze, więc go nie wysyłamy (patrz commit
+      // 702b448). Zamiast tego, gdy sprzedawca ma zweryfikowaną siatkę,
+      // podajemy JĄ jako tabelę — inaczej AI (bez zdjęcia i bez notatek) nie
+      // miałoby żadnych liczb, żeby ocenić "krojLuz" tak jak każe mu prompt
+      // ("oceń PRZEDE WSZYSTKIM z wymiarów tabeli, nie z nazwy"), i zgadywałoby
+      // wyłącznie z nazwy produktu. AI i tak nie decyduje o liczbach w tabeli
+      // wynikowej — te bierze silnik z tej samej siatki (applyStructuredRows).
+      productSizeData: (() => {
+        const rows = parseStructuredRows(rule.structuredSizeData);
+        return rows ? structuredRowsAsPromptText(rows) : null;
+      })(),
       productNotes: rule.customNotes || null,
       sizeChartImage: useImage ? rule.sizeChartImage : null,
       hasSizeChartImage: useImage,

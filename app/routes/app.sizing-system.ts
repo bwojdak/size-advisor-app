@@ -8,6 +8,7 @@ import {
   getAIConfig,
   EXTRACTION_VERSION,
   parseStructuredRows,
+  structuredRowsAsPromptText,
 } from "../lib/size-advisor.server";
 
 type SystemRow = {
@@ -15,6 +16,7 @@ type SystemRow = {
   name: string;
   parsedSizeData: string | null;
   customNotes: string | null;
+  structuredSizeData: string | null;
 };
 
 // Analiza AI systemu rozmiarów. Bez opisu produktu (system nie jest przypięty
@@ -34,10 +36,15 @@ async function runSystemExtraction(
       productDescription: null,
       brandStyleNotes: opts.brandStyleNotes,
       // Patrz analogiczny komentarz w app.product-rule.ts: `parsedSizeData`
-      // nie ma już swojego pola w edytorze systemu, więc nie zasila analizy —
-      // inaczej stara, niewidoczna wartość sprzed zmiany wpływałaby na wynik
-      // "Przeanalizuj ponownie" bez możliwości jej wyczyszczenia z panelu.
-      productSizeData: null,
+      // nie ma już swojego pola w edytorze, więc go nie wysyłamy. Zamiast
+      // tego, gdy jest zweryfikowana siatka, podajemy JĄ jako tabelę — bez
+      // tego, dla systemu bez zdjęcia (systemy go nie obsługują), AI nie
+      // miałoby żadnych liczb do oceny "krojLuz" i zgadywałoby wyłącznie z
+      // nazwy systemu.
+      productSizeData: (() => {
+        const rows = parseStructuredRows(system.structuredSizeData);
+        return rows ? structuredRowsAsPromptText(rows) : null;
+      })(),
       productNotes: system.customNotes || null,
       sizeChartImage: null,
       hasSizeChartImage: false,

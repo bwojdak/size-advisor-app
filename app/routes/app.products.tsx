@@ -603,8 +603,11 @@ export default function ProductsConfig() {
                           {rule.sizingSystemId ? (
                             // Zmapowany na system → własna tabela/zdjęcie/notatki
                             // produktu są uśpione (silnik bierze dane z systemu),
-                            // więc pokazujemy tylko badge systemu.
-                            <Badge tone="info">
+                            // więc pokazujemy tylko badge systemu. Inny tone niż
+                            // pozostałe (niebieskie) badge'e — żeby "to nie jest
+                            // config tego produktu, tylko przypięty system" od
+                            // razu rzucało się w oczy, nie zlewało z resztą.
+                            <Badge tone="attention">
                               {t("products.badge.system", {
                                 name:
                                   systemNameById.get(rule.sizingSystemId) ?? "",
