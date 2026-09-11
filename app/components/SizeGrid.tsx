@@ -85,10 +85,14 @@ export function gridToPayload(rows: GridRow[]): string | null {
 // po obwodzie, długość/nogawka do grading po długości). Sprzedawca WYBIERA z
 // tej listy, nie wpisuje własnej nazwy — inaczej dodana kolumna byłaby tylko
 // martwymi danymi, które nic nie liczy.
+// Przykładowe liczby w placeholderach są NA PŁASKO (pacha-pacha / pas-płasko /
+// biodra-płasko), bo tak zwykle wygląda pomiar na metce — nie pełny obwód.
+// Silnik i tak rozpozna obie konwencje automatycznie (patrz grid.help), to
+// tylko domyślny przykład, żeby nie sugerować, że trzeba podawać obwód.
 const ALL_COLS: Array<{ key: keyof GridRow; labelKey: string; ph: string }> = [
-  { key: "chest", labelKey: "grid.col.chest", ph: "110" },
-  { key: "waist", labelKey: "grid.col.waist", ph: "96" },
-  { key: "hip", labelKey: "grid.col.hip", ph: "112" },
+  { key: "chest", labelKey: "grid.col.chest", ph: "55" },
+  { key: "waist", labelKey: "grid.col.waist", ph: "40" },
+  { key: "hip", labelKey: "grid.col.hip", ph: "50" },
   { key: "length", labelKey: "grid.col.length", ph: "68" },
   { key: "inseam", labelKey: "grid.col.inseam", ph: "80" },
 ];
