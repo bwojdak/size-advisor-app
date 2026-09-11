@@ -497,6 +497,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "grid.title": "Verified size table",
     "grid.help":
       "Type exact measurements per size — this overrides the AI's reading of the chart and removes parsing mistakes (e.g. a full measurement mistaken for a half one). Chest/waist/hip can be given laid flat (armpit-to-armpit, the way it's usually printed on the tag) or as a full circumference — we detect which one automatically from the size of the numbers, no need to convert. The columns are a closed list of standard apparel-industry measurement points — add/remove per product. Leave a field blank where it doesn't apply.",
+    "grid.examplePrefix": "e.g.",
     "grid.col.size": "Size",
     "grid.col.chest": "Chest",
     "grid.col.waist": "Waist",
