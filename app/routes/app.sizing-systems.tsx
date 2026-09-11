@@ -37,6 +37,7 @@ import {
   gridToPayload,
   type GridRow,
 } from "../components/SizeGrid";
+import { ConsistencyCheck, type ConsistencyIssue } from "../components/ConsistencyCheck";
 
 const MAX_IMAGE_BYTES = 2.5 * 1024 * 1024;
 
@@ -241,9 +242,15 @@ export default function SizingSystemsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [consistency, setConsistency] = useState<{
+    issues: ConsistencyIssue[];
+    tested: number;
+  } | null>(null);
+  const [consistencyChecking, setConsistencyChecking] = useState(false);
 
   const openNew = () => {
     setImageError(null);
+    setConsistency(null);
     setEditing({
       id: null,
       name: "",
@@ -261,6 +268,7 @@ export default function SizingSystemsPage() {
   // przy pojedynczym produkcie — jedno świadome kliknięcie to tania polisa.
   const openEdit = (s: SystemView) => {
     setImageError(null);
+    setConsistency(null);
     setEditing({
       id: s.id,
       name: s.name,
@@ -307,6 +315,7 @@ export default function SizingSystemsPage() {
     setSaving(true);
     setError(null);
     try {
+      const structuredSizeData = gridToPayload(editing.gridRows);
       const res = await authFetch(
         "/app/sizing-system",
         {
@@ -314,7 +323,7 @@ export default function SizingSystemsPage() {
           name: editing.name,
           parsedSizeData: editing.parsedSizeData,
           customNotes: editing.customNotes,
-          structuredSizeData: gridToPayload(editing.gridRows),
+          structuredSizeData,
           sizeChartImage: editing.image,
         },
         locale,
@@ -330,6 +339,26 @@ export default function SizingSystemsPage() {
         setEditing((e) => (e ? { ...e, id: res.id } : e));
       }
       revalidator.revalidate();
+
+      // Test spójności (czysta funkcja silnika, bez AI) — od razu po zapisie.
+      // Systemy są współdzielone przez wiele produktów, więc warto to widzieć
+      // natychmiast, nie dopiero jak jakiś klient trafi na dziwny wynik.
+      if (structuredSizeData) {
+        setConsistencyChecking(true);
+        setConsistency(null);
+        try {
+          const cr = await authFetch(
+            "/app/check-consistency",
+            { structuredSizeData, category },
+            locale,
+          );
+          setConsistency({ issues: cr.issues ?? [], tested: cr.tested ?? 0 });
+        } finally {
+          setConsistencyChecking(false);
+        }
+      } else {
+        setConsistency(null);
+      }
     } catch (err) {
       setError(
         err instanceof Error && err.message
@@ -587,6 +616,11 @@ export default function SizingSystemsPage() {
                   </Button>
                 </InlineStack>
               ) : null}
+              <ConsistencyCheck
+                issues={consistency?.issues ?? null}
+                tested={consistency?.tested ?? 0}
+                checking={consistencyChecking}
+              />
             </BlockStack>
             <TextField
               label={t("sizingSystems.notesLabel")}

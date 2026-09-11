@@ -183,8 +183,19 @@ function clamp(n: number, lo: number, hi: number) {
 }
 
 function sizeIndex(size: string): number {
-  const i = CANON_SIZES.indexOf(size.toUpperCase().replace(/\s+/g, ""));
-  return i === -1 ? 50 : i;
+  const norm = size.toUpperCase().replace(/\s+/g, "");
+  const i = CANON_SIZES.indexOf(norm);
+  if (i !== -1) return i;
+  // Rozmiary numeryczne (jeansy: 26, 28, 30, 30T…) nie są w CANON_SIZES —
+  // bez tego wszystkie takie wiersze dostawały ten sam indeks (50), więc
+  // Array.sort (stabilny) zostawiał je w kolejności wpisania w panelu, a nie
+  // rosnącego rozmiaru. Cała reszta silnika (sąsiedzi, strażnik
+  // monotoniczności, szukanie okna) zakłada rosnące sortowanie — więc
+  // kolejność wpisania mogła po cichu psuć wynik dla numerycznie rozmiarowanych
+  // produktów. Offset +100, żeby nigdy nie kolidować z indeksami liter (0-9).
+  const numeric = parseInt(norm, 10);
+  if (Number.isFinite(numeric)) return 100 + numeric;
+  return 1000; // naprawdę nieznana etykieta — na koniec, stabilnie między sobą
 }
 
 // Zgrubne oszacowanie obwodów ciała – używane, gdy model nie poda sensownej liczby.
@@ -1113,6 +1124,125 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
     ...neighborLabels(rows, chosen.size),
     fitScale,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Automatyczny test spójności tabeli — bateria sylwetek przez resolveSize
+// ---------------------------------------------------------------------------
+
+export type ConsistencyIssue = {
+  axis: "height" | "weight";
+  gender: "male" | "female";
+  build: string;
+  /** Punkt bezpośrednio PRZED spadkiem i sam spadek, do czytelnego komunikatu. */
+  from: { point: number; size: string };
+  to: { point: number; size: string };
+};
+
+// Gęste bez obaw o koszt/czas — to czysta funkcja bez AI, cała bateria to
+// ~250 wywołań resolveSize, rzędu pojedynczych milisekund łącznie.
+const CONSISTENCY_HEIGHTS = Array.from({ length: 12 }, (_, i) => 150 + i * 5); // 150..205
+const CONSISTENCY_WEIGHTS = Array.from({ length: 17 }, (_, i) => 50 + i * 5); // 50..130
+const CONSISTENCY_BUILDS = ["slim", "standard", "athletic", "plus"];
+const CONSISTENCY_GENDERS = ["male", "female"] as const;
+// Przybliżone typowe BMI per budowa — przy zamiataniu WZROSTU waga musi rosnąć
+// razem z nim proporcjonalnie (stałe BMI), inaczej np. 150cm + jedna uniwersalna
+// „stała" waga 80kg dla mężczyzny to fizjologicznie sprzeczne wejście (BMI ~36
+// przy budowie „szczupła") i estymator/klamry (74–152cm) reagują na to
+// niemonotonicznie — fałszywy alarm o niespójności tabeli, nie prawdziwy błąd.
+const CONSISTENCY_BMI_BY_BUILD: Record<string, number> = {
+  slim: 19.5,
+  standard: 23,
+  athletic: 24.5,
+  plus: 29,
+};
+const CONSISTENCY_FIXED_HEIGHT: Record<string, number> = { male: 178, female: 165 };
+
+/** Ile sylwetek faktycznie sprawdza jeden `checkConsistency` — do pokazania
+ *  w panelu ("spójna na X przetestowanych sylwetkach"), żeby ta liczba nie
+ *  była osobną, mogącą się rozjechać stałą po stronie UI. */
+export const CONSISTENCY_PROFILE_COUNT =
+  (CONSISTENCY_HEIGHTS.length + CONSISTENCY_WEIGHTS.length) *
+  CONSISTENCY_BUILDS.length *
+  CONSISTENCY_GENDERS.length;
+// Ile spadków pokazujemy per (oś, płeć, budowa) — pierwszy zwykle wystarcza,
+// żeby admin wiedział, gdzie szukać w tabeli; więcej to już szum.
+const CONSISTENCY_MAX_PER_SWEEP = 1;
+
+/** Testuje zweryfikowaną tabelę na baterii reprezentatywnych sylwetek (bez
+ *  AI, sama matematyka silnika) i łapie klasę błędów niewidocznych przy
+ *  patrzeniu na same liczby w tabeli: przy rosnącym wzroście/wadze rozmiar
+ *  NIGDY nie powinien się cofnąć. Jeśli się cofa, to sygnał realnego
+ *  problemu w danych (literówka, pomylona kolumna, brakujący wiersz) —
+ *  dokładnie tej klasy bugów, które w tej sesji za każdym razem znajdowaliśmy
+ *  ręcznie, próbując różnych wzrostów na jednym konkretnym produkcie.
+ *  Uruchamiane przy każdym zapisie tabeli (produktu lub systemu). */
+export function checkConsistency(extraction: ChartExtraction): ConsistencyIssue[] {
+  if (extraction.rows.length < 2) return [];
+  const issues: ConsistencyIssue[] = [];
+
+  const sweep = (
+    axis: "height" | "weight",
+    gender: "male" | "female",
+    build: string,
+    points: number[],
+    run: (v: number) => ResolveResult | null,
+  ) => {
+    let prev: { point: number; idx: number; size: string } | null = null;
+    let found = 0;
+    for (const point of points) {
+      if (found >= CONSISTENCY_MAX_PER_SWEEP) break;
+      const res = run(point);
+      if (!res) {
+        prev = null; // brak dopasowania przerywa ciągłość porównania, nie licz jako spadek
+        continue;
+      }
+      const idx = sizeIndex(res.size);
+      if (prev && idx < prev.idx) {
+        issues.push({
+          axis,
+          gender,
+          build,
+          from: { point: prev.point, size: prev.size },
+          to: { point, size: res.size },
+        });
+        found += 1;
+      }
+      prev = { point, idx, size: res.size };
+    }
+  };
+
+  for (const gender of CONSISTENCY_GENDERS) {
+    for (const build of CONSISTENCY_BUILDS) {
+      sweep("height", gender, build, CONSISTENCY_HEIGHTS, (height) =>
+        resolveSize({
+          extraction,
+          height,
+          // Waga skalowana ze wzrostem przy stałym BMI (patrz komentarz przy
+          // CONSISTENCY_BMI_BY_BUILD) — izoluje efekt SAMEGO wzrostu zamiast
+          // mieszać go z fizjologicznie niespójną, uniwersalną wagą.
+          weight: Math.round(CONSISTENCY_BMI_BY_BUILD[build] * (height / 100) ** 2),
+          gender,
+          bodyType: build,
+          fit: null,
+          allowKorekta: false,
+        }),
+      );
+      sweep("weight", gender, build, CONSISTENCY_WEIGHTS, (weight) =>
+        resolveSize({
+          extraction,
+          height: CONSISTENCY_FIXED_HEIGHT[gender],
+          weight,
+          gender,
+          bodyType: build,
+          fit: null,
+          allowKorekta: false,
+        }),
+      );
+    }
+  }
+
+  return issues;
 }
 
 function nearest(

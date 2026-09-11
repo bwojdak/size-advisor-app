@@ -85,6 +85,20 @@ const messages: Record<Locale, Record<string, string>> = {
     "grid.verifyToast":
       "Wypełniono danymi z analizy AI — sprawdź liczby przed zapisem, AI mogło się pomylić.",
     "grid.verifiedBadge": "Zweryfikowana siatka",
+    "consistency.title": "Test spójności tabeli",
+    "consistency.checking": "Sprawdzanie na sylwetkach testowych…",
+    "consistency.ok": "Spójna na {n} przetestowanych sylwetkach — przy rosnącym wzroście/wadze rozmiar nigdzie się nie cofa.",
+    "consistency.issues": "{n} niespójności — sprawdź te miejsca w tabeli:",
+    "consistency.issue":
+      "{axis} {from}→{to} ({gender}, {build}): rozmiar spada z {fromSize} na {toSize}",
+    "consistency.axis.height": "wzrost",
+    "consistency.axis.weight": "waga",
+    "consistency.gender.male": "mężczyzna",
+    "consistency.gender.female": "kobieta",
+    "consistency.build.slim": "szczupła",
+    "consistency.build.standard": "standardowa",
+    "consistency.build.athletic": "atletyczna",
+    "consistency.build.plus": "masywna",
     "sizingSystems.notesLabel": "Notatki dla AI (opcjonalnie)",
     "sizingSystems.notesHelp":
       "Krój, materiał, korekty rozmiaru (np. „rozmiarówka zaniżona — brać większy”) — liczby i tak biorą się z siatki wyżej, to pole pomaga tylko sklasyfikować produkt.",
@@ -517,6 +531,20 @@ const messages: Record<Locale, Record<string, string>> = {
     "grid.verifyToast":
       "Filled from the AI analysis — check the numbers before saving, the AI may have gotten something wrong.",
     "grid.verifiedBadge": "Verified grid",
+    "consistency.title": "Table consistency check",
+    "consistency.checking": "Checking against test body profiles…",
+    "consistency.ok": "Consistent across {n} tested body profiles — size never drops as height/weight increase.",
+    "consistency.issues": "{n} inconsistencies found — check these spots in the table:",
+    "consistency.issue":
+      "{axis} {from}→{to} ({gender}, {build}): size drops from {fromSize} to {toSize}",
+    "consistency.axis.height": "height",
+    "consistency.axis.weight": "weight",
+    "consistency.gender.male": "male",
+    "consistency.gender.female": "female",
+    "consistency.build.slim": "slim",
+    "consistency.build.standard": "standard",
+    "consistency.build.athletic": "athletic",
+    "consistency.build.plus": "plus-size",
     "sizingSystems.notesLabel": "Notes for the AI (optional)",
     "sizingSystems.notesHelp":
       "Cut, material, size adjustments (e.g. “runs small — size up”) — the numbers still come from the grid above, this field only helps classify the product.",

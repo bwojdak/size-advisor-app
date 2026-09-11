@@ -35,6 +35,7 @@ import {
   type NormalizedSizeRow,
 } from "../lib/size-advisor.server";
 import { SizeGrid, rowsToGrid, gridToPayload, type GridRow } from "../components/SizeGrid";
+import { ConsistencyCheck, type ConsistencyIssue } from "../components/ConsistencyCheck";
 
 type ExtractionInfo =
   | { state: "ok"; at: string | null; summary: ReturnType<typeof describeExtraction> }
@@ -172,6 +173,24 @@ async function submitRule(body: Record<string, unknown>, locale: Locale) {
   return json;
 }
 
+async function fetchConsistency(
+  structuredSizeData: string | null,
+  category: string | null,
+  locale: Locale,
+): Promise<{ issues: ConsistencyIssue[]; tested: number }> {
+  const api = (window as unknown as { shopify?: { idToken: () => Promise<string> } }).shopify;
+  const token = api ? await api.idToken() : null;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`/app/check-consistency?locale=${locale}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ structuredSizeData, category }),
+  });
+  const json = await res.json().catch(() => ({ issues: [], tested: 0 }));
+  return { issues: json.issues ?? [], tested: json.tested ?? 0 };
+}
+
 export default function ProductsConfig() {
   const {
     rules,
@@ -277,6 +296,11 @@ export default function ProductsConfig() {
   const [notes, setNotes] = useState("");
   const [sizeText, setSizeText] = useState("");
   const [gridRows, setGridRows] = useState<GridRow[]>([]);
+  const [consistency, setConsistency] = useState<{
+    issues: ConsistencyIssue[];
+    tested: number;
+  } | null>(null);
+  const [consistencyChecking, setConsistencyChecking] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"save" | "delete" | null>(null);
@@ -317,6 +341,7 @@ export default function ProductsConfig() {
       setImage(existing?.sizeChartImage || null);
       setImageError(null);
       setActionError(null);
+      setConsistency(null);
       const structured = structuredByProduct[productId];
       // Prosta, przewidywalna zasada: tabela pokazuje dokładnie to, co jest
       // zapisane — albo nic. Żadnego zgadywania/auto-podstawiania w tle.
@@ -375,6 +400,7 @@ export default function ProductsConfig() {
     setBusy("save");
     setActionError(null);
     try {
+      const structuredSizeData = gridToPayload(gridRows);
       await submitRule(
         {
           intent: "save",
@@ -382,7 +408,7 @@ export default function ProductsConfig() {
           productTitle: editing.title,
           customNotes: notes,
           parsedSizeData: sizeText,
-          structuredSizeData: gridToPayload(gridRows),
+          structuredSizeData,
           sizeChartImage: image,
         },
         locale,
@@ -391,6 +417,24 @@ export default function ProductsConfig() {
       // Okno zostaje otwarte po zapisie — od razu widać w siatce, że zmiana
       // faktycznie przeszła, zamiast zgadywać po ponownym otwarciu edytora.
       revalidator.revalidate();
+
+      // Test spójności (czysta funkcja silnika, bez AI) — od razu po zapisie,
+      // żeby ewentualną niespójność zobaczyć na miejscu, a nie dopiero jak
+      // jakiś klient trafi na dziwny wynik. Tylko gdy jest sensowna tabela —
+      // pusta/za krótka nie ma czego sprawdzać.
+      if (structuredSizeData) {
+        const ext = extractions[editing.productId];
+        const category = ext?.state === "ok" ? ext.summary.category : null;
+        setConsistencyChecking(true);
+        setConsistency(null);
+        try {
+          setConsistency(await fetchConsistency(structuredSizeData, category, locale));
+        } finally {
+          setConsistencyChecking(false);
+        }
+      } else {
+        setConsistency(null);
+      }
     } catch (err) {
       setActionError(
         err instanceof Error && err.message ? err.message : t("products.error.saveFailed"),
@@ -398,7 +442,7 @@ export default function ProductsConfig() {
     } finally {
       setBusy(null);
     }
-  }, [editing, notes, sizeText, gridRows, image, revalidator, locale, t]);
+  }, [editing, notes, sizeText, gridRows, image, revalidator, locale, t, extractions]);
 
   const removeRule = useCallback(async () => {
     if (!editing) return;
@@ -947,6 +991,11 @@ export default function ProductsConfig() {
                   </Button>
                 </InlineStack>
               ) : null}
+              <ConsistencyCheck
+                issues={consistency?.issues ?? null}
+                tested={consistency?.tested ?? 0}
+                checking={consistencyChecking}
+              />
             </BlockStack>
 
             <TextField
