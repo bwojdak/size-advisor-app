@@ -21,6 +21,8 @@ import { useI18n, type Locale } from "../lib/i18n";
 import {
   parseStoredExtraction,
   parseStructuredRows,
+  applyStructuredRows,
+  emptyExtraction,
   describeExtraction,
   EXTRACTION_VERSION,
   type NormalizedSizeRow,
@@ -82,8 +84,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         s.extractionVersion === EXTRACTION_VERSION
           ? parseStoredExtraction(s.extractionJson)
           : null;
-      if (parsed) {
-        extraction = { state: "ok", summary: describeExtraction(parsed) };
+      // "Co zrozumiała AI" musi pokazywać to, czego FAKTYCZNIE używa silnik
+      // (klasyfikacja z AI + liczby z zweryfikowanej siatki, jeśli jest —
+      // patrz applyStructuredRows), nie samą surową odpowiedź AI. Inaczej dla
+      // systemu bez zdjęcia/opisu, gdzie AI samo z siebie nie ma z czego
+      // wyczytać wymiarów, panel pokazywałby „brak tabeli rozmiarów" mimo
+      // zapisanej, kompletnej i realnie używanej siatki.
+      const base = parsed ?? (s.structuredSizeData ? emptyExtraction() : null);
+      if (base) {
+        const effective = applyStructuredRows(base, s.structuredSizeData);
+        extraction = { state: "ok", summary: describeExtraction(effective) };
       }
     }
     const attached = productsBySystem.get(s.id) ?? [];

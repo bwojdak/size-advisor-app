@@ -28,6 +28,8 @@ import { LockedFeature } from "../components/LockedFeature";
 import {
   parseStoredExtraction,
   parseStructuredRows,
+  applyStructuredRows,
+  emptyExtraction,
   describeExtraction,
   EXTRACTION_VERSION,
   type NormalizedSizeRow,
@@ -109,11 +111,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       r.extractionVersion === EXTRACTION_VERSION
         ? parseStoredExtraction(r.extractionJson)
         : null;
-    extractions[r.productId] = parsed
+    // "Co zrozumiała AI" musi pokazywać to, czego FAKTYCZNIE używa silnik
+    // (klasyfikacja z AI + liczby z zweryfikowanej siatki, jeśli jest — patrz
+    // applyStructuredRows), nie samą surową odpowiedź AI. Inaczej dla
+    // produktu bez zdjęcia/opisu z wymiarami, gdzie AI samo z siebie nie ma
+    // z czego wyczytać wymiarów, panel pokazywałby „brak tabeli rozmiarów"
+    // mimo zapisanej, kompletnej i realnie używanej siatki.
+    const base = parsed ?? (r.structuredSizeData ? emptyExtraction() : null);
+    extractions[r.productId] = base
       ? {
           state: "ok",
           at: r.extractionAt ? r.extractionAt.toISOString() : null,
-          summary: describeExtraction(parsed),
+          summary: describeExtraction(
+            applyStructuredRows(base, r.structuredSizeData),
+          ),
         }
       : { state: "pending" };
   }
