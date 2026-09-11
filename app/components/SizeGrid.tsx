@@ -159,8 +159,17 @@ export function SizeGrid({
     [rowsWithSize],
   );
   const removeCol = useCallback(
-    (key: keyof GridRow) => setVisibleDims((v) => v.filter((k) => k !== key)),
-    [],
+    (key: keyof GridRow) => {
+      setVisibleDims((v) => v.filter((k) => k !== key));
+      // Samo ukrycie kolumny nie wystarczy: zapis i tak wysyłałby stare
+      // wartości z `rows` (payload nie filtruje po visibleDims), a po
+      // ponownym otwarciu kolumna wróciłaby sama, bo widoczność liczy się
+      // też z realnej obecności danych (patrz inicjalizacja visibleDims
+      // wyżej). „Usuń kolumnę" musi więc naprawdę czyścić wartości w tym
+      // polu we wszystkich wierszach, nie tylko chować nagłówek.
+      onChange(rows.map((r) => ({ ...r, [key]: "" })));
+    },
+    [rows, onChange],
   );
   const addCol = useCallback((key: string) => {
     if (!key) return;
@@ -255,7 +264,13 @@ export function SizeGrid({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: `72px repeat(${COLS.length}, 84px) 28px`,
+              // `repeat(0, …)` jest nieprawidłowym CSS (liczba powtórzeń musi
+              // być ≥1) — po usunięciu WSZYSTKICH kolumn przeglądarka
+              // odrzucała całą wartość grid-template-columns i tabela się
+              // rozjeżdżała. Przy 0 kolumn wymiarów zostają tylko rozmiar i ×.
+              gridTemplateColumns: COLS.length
+                ? `72px repeat(${COLS.length}, 84px) 28px`
+                : "72px 28px",
               gap: "6px",
               alignItems: "end",
               minWidth: `${100 + COLS.length * 90}px`,
