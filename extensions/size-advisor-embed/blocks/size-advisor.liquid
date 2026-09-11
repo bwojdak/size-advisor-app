@@ -114,16 +114,7 @@
             {{ 'size_advisor.garment_toggle' | t }}
           </button>
           <div id="sa-garment-fields" class="sa-garment-fields" hidden>
-            <div class="sa-grid-inputs">
-              <div class="sa-input-col">
-                <label class="sa-label" for="sa-ref-brand" data-i18n="garment_brand">{{ 'size_advisor.garment_brand' | t }}</label>
-                <input type="text" id="sa-ref-brand" autocomplete="off" data-i18n-ph="garment_brand_ph" placeholder="{{ 'size_advisor.garment_brand_ph' | t }}">
-              </div>
-              <div class="sa-input-col">
-                <label class="sa-label" for="sa-ref-size" data-i18n="garment_size">{{ 'size_advisor.garment_size' | t }}</label>
-                <input type="text" id="sa-ref-size" autocomplete="off" data-i18n-ph="garment_size_ph" placeholder="{{ 'size_advisor.garment_size_ph' | t }}">
-              </div>
-            </div>
+            <div class="sa-grid-inputs" id="sa-garment-dyn"></div>
             <p class="sa-garment-hint" data-i18n="garment_hint">{{ 'size_advisor.garment_hint' | t }}</p>
           </div>
         </div>
@@ -464,6 +455,8 @@
   }
   .sa-garment-toggle[aria-expanded="true"]::after { transform: rotate(90deg); }
   .sa-garment-fields { margin-top: 8px; }
+  #sa-garment-dyn { flex-wrap: wrap; }
+  #sa-garment-dyn .sa-input-col { flex: 1 1 88px; min-width: 88px; }
   .sa-garment-hint { margin: 6px 0 0; font-size: 12px; color: var(--sa-muted); line-height: 1.4; }
 
   #get-recommendation-btn {
@@ -744,7 +737,12 @@
     weight_ph_lb: {{ 'size_advisor.weight_ph_lb' | t | json }},
     fit_tighter: {{ 'size_advisor.fit_tighter' | t | json }},
     fit_looser: {{ 'size_advisor.fit_looser' | t | json }},
-    fit_you: {{ 'size_advisor.fit_you' | t | json }}
+    fit_you: {{ 'size_advisor.fit_you' | t | json }},
+    garment_dim_chest: {{ 'size_advisor.garment_dim_chest' | t | json }},
+    garment_dim_waist: {{ 'size_advisor.garment_dim_waist' | t | json }},
+    garment_dim_hip: {{ 'size_advisor.garment_dim_hip' | t | json }},
+    garment_dim_length: {{ 'size_advisor.garment_dim_length' | t | json }},
+    garment_dim_inseam: {{ 'size_advisor.garment_dim_inseam' | t | json }}
   };
   window.__SA_LOCALE = {{ localization.language.iso_code | json }};
 
@@ -778,11 +776,12 @@
       fit_looser: "Luźniej",
       fit_you: "Ty",
       garment_toggle: "Mam ubranie tego typu, które leży idealnie",
-      garment_brand: "Marka",
-      garment_brand_ph: "Marka",
-      garment_size: "Rozmiar",
-      garment_size_ph: "np. M lub 32",
-      garment_hint: "Dobierzemy rozmiar tak, żeby leżał podobnie.",
+      garment_hint: "Zmierz ubranie na płasko (np. pacha-pacha) — dobierzemy rozmiar, żeby leżał podobnie.",
+      garment_dim_chest: "Klatka (na płasko)",
+      garment_dim_waist: "Pas (na płasko)",
+      garment_dim_hip: "Biodra (na płasko)",
+      garment_dim_length: "Długość",
+      garment_dim_inseam: "Nogawka",
       calc: "Oblicz rozmiar",
       calc_loading: "Analizuję sylwetkę…",
       err_height: "Podaj poprawny wzrost ([range]).",
@@ -829,11 +828,12 @@
       fit_looser: "Looser",
       fit_you: "You",
       garment_toggle: "I have a garment of this type that fits perfectly",
-      garment_brand: "Brand",
-      garment_brand_ph: "Brand",
-      garment_size: "Its size",
-      garment_size_ph: "e.g. M or 32",
-      garment_hint: "We'll pick a size that fits like that one.",
+      garment_hint: "Measure it flat (e.g. pit-to-pit) — we'll pick a size that fits the same way.",
+      garment_dim_chest: "Chest (flat)",
+      garment_dim_waist: "Waist (flat)",
+      garment_dim_hip: "Hip (flat)",
+      garment_dim_length: "Length",
+      garment_dim_inseam: "Inseam",
       calc: "Calculate size",
       calc_loading: "Analyzing your build…",
       err_height: "Enter a valid height ([range]).",
@@ -920,12 +920,16 @@
     let allowAddToCart = false;
     let askFitPref = false;
     let askGarment = false;
+    let garmentDims = [];
     let autoSize = false;
     // Ostatnie policzone dane — powtórne „Oblicz" z tymi samymi wartościami, gdy
     // wynik już jest na ekranie, nie wysyła kolejnego zapytania.
     let lastCalcKey = null;
     try {
-      const statusRes = await fetch('/apps/size-advisor/status?v=' + Date.now(), { cache: 'no-store' });
+      const statusRes = await fetch(
+        '/apps/size-advisor/status?v=' + Date.now() + '&productId=' + encodeURIComponent({{ product.id | json }}),
+        { cache: 'no-store' },
+      );
       const statusData = await statusRes.json();
 
       if (!statusData.enabled) {
@@ -940,12 +944,38 @@
         if (fw) fw.hidden = false;
       }
 
-      askGarment = statusData.garmentMatch === true;
+      garmentDims = Array.isArray(statusData.garmentDims) ? statusData.garmentDims : [];
+      // Sekcja pokazuje się tylko gdy TA tabela ma czym porównać ubranie
+      // referencyjne (produkt bez tabeli / nieodzieżowy → garmentDims puste).
+      askGarment = statusData.garmentMatch === true && garmentDims.length > 0;
       if (askGarment) {
         const gw = document.getElementById('sa-garment-wrap');
         if (gw) gw.hidden = false;
         const gt = document.getElementById('sa-garment-toggle');
         const gf = document.getElementById('sa-garment-fields');
+        const dyn = document.getElementById('sa-garment-dyn');
+        if (dyn) {
+          const dimLabel = {
+            chest: 'garment_dim_chest',
+            waist: 'garment_dim_waist',
+            hip: 'garment_dim_hip',
+            length: 'garment_dim_length',
+            inseam: 'garment_dim_inseam',
+          };
+          dyn.innerHTML = garmentDims
+            .map((d) => {
+              const key = dimLabel[d];
+              if (!key) return '';
+              const label = esc(t(key, d));
+              return (
+                '<div class="sa-input-col">' +
+                  '<label class="sa-label" for="sa-ref-' + d + '">' + label + '</label>' +
+                  '<input type="number" id="sa-ref-' + d + '" inputmode="decimal" autocomplete="off" placeholder="cm">' +
+                '</div>'
+              );
+            })
+            .join('');
+        }
         if (gt && gf) {
           gt.addEventListener('click', () => {
             const open = gf.hidden;
@@ -1300,6 +1330,21 @@
         ? (hUnit === 'in' ? '55–85 in' : '140–215 cm')
         : (wUnit === 'lb' ? '88–397 lb' : '40–180 kg');
 
+    // Wymiary ubrania referencyjnego z dynamicznych pól (patrz garmentDims) —
+    // ta sama jednostka co wzrost (hUnit), bo to też pomiar na płasko w cm/in.
+    function collectRefMeasurements() {
+      if (!askGarment) return {};
+      const out = {};
+      garmentDims.forEach((d) => {
+        const el = document.getElementById('sa-ref-' + d);
+        const raw = el ? Number(el.value) : NaN;
+        if (Number.isFinite(raw) && raw > 0) {
+          out[d] = Math.round(hUnit === 'in' ? raw * IN_PER_CM : raw);
+        }
+      });
+      return out;
+    }
+
     if (calcBtn) {
       calcBtn.addEventListener('click', async () => {
         if (calcBtn.dataset.loading === '1') return;
@@ -1324,9 +1369,8 @@
         const _fp = askFitPref
           ? (document.querySelector('#sa-fit-group .sa-pill-btn.active')?.dataset.value || 'regular')
           : '';
-        const _rb = askGarment ? (document.getElementById('sa-ref-brand')?.value || '').trim() : '';
-        const _rs = askGarment ? (document.getElementById('sa-ref-size')?.value || '').trim() : '';
-        const calcKey = [height, weight, gender, bodyType, _fp, _rb, _rs, saLang].join('|');
+        const refM = collectRefMeasurements();
+        const calcKey = [height, weight, gender, bodyType, _fp, JSON.stringify(refM), saLang].join('|');
         const resultShown = resultDiv && !resultDiv.hidden && resultDiv.classList.contains('sa-result--ok');
         if (calcKey === lastCalcKey && resultShown) {
           // te same dane + wynik już widoczny → nic nie ruszamy (przycisk koszyka zostaje)
@@ -1342,8 +1386,6 @@
         setResult('loading', '<span>' + I18N.calc_loading + '</span>');
 
         const fitPreference = _fp;
-        const refBrand = _rb;
-        const refSize = _rs;
 
         try {
           const payload = JSON.stringify({
@@ -1352,8 +1394,7 @@
             gender,
             bodyType,
             fitPreference,
-            refBrand,
-            refSize,
+            refMeasurements: refM,
             locale: saLang || window.__SA_LOCALE || 'en',
             productId: {{ product.id | json }},
             productTitle: {{ product.title | default: "" | json }},
@@ -1377,7 +1418,7 @@
             lastCalcKey = calcKey; // zapamiętaj — powtórka z tymi samymi danymi nie wyśle zapytania
             // Zapamiętaj profil + wynik: kolejne produkty pokażą „Mój rozmiar".
             // Pasek tylko dla produktów z prawdziwą rozmiarówką (source=chart).
-            if (!refBrand && !refSize) {
+            if (!Object.keys(refM).length) {
               const prof = { g: gender, h: height, w: weight, bt: bodyType, fp: fitPreference || '' };
               saveProfile(prof);
               saveSize(prof, data);
@@ -1497,8 +1538,7 @@
           gender: p.g,
           bodyType: p.bt,
           fitPreference: askFitPref ? (p.fp || 'regular') : '',
-          refBrand: '',
-          refSize: '',
+          refMeasurements: {},
           locale: saLang || window.__SA_LOCALE || 'en',
           productId: {{ product.id | json }},
           productTitle: {{ product.title | default: "" | json }},

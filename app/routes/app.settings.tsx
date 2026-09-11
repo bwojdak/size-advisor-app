@@ -240,8 +240,8 @@ export default function SettingsPage() {
   const [testGender, setTestGender] = useState("male");
   const [testBody, setTestBody] = useState("standard");
   const [testFit, setTestFit] = useState("");
-  const [testRefBrand, setTestRefBrand] = useState("");
-  const [testRefSize, setTestRefSize] = useState("");
+  const [testRefWidth, setTestRefWidth] = useState("");
+  const [testRefLength, setTestRefLength] = useState("");
   const [testProduct, setTestProduct] = useState<{ id: string; title: string } | null>(
     null,
   );
@@ -322,8 +322,12 @@ export default function SettingsPage() {
           gender: testGender,
           bodyType: testBody,
           fitPreference: testFit,
-          refBrand: testRefBrand,
-          refSize: testRefSize,
+          refMeasurements: {
+            ...(Number(testRefWidth) > 0
+              ? { chest: Number(testRefWidth), waist: Number(testRefWidth) }
+              : {}),
+            ...(Number(testRefLength) > 0 ? { length: Number(testRefLength) } : {}),
+          },
           productId: testProduct?.id,
         },
         locale,
@@ -765,20 +769,22 @@ export default function SettingsPage() {
                     </Text>
                     <InlineGrid columns={{ xs: 1, sm: 2 }} gap="300">
                       <TextField
-                        label={t("settings.tester.refBrand")}
+                        label={t("settings.tester.refWidth")}
                         labelHidden
-                        placeholder={t("settings.tester.refBrand")}
+                        type="number"
+                        placeholder={t("settings.tester.refWidth")}
                         autoComplete="off"
-                        value={testRefBrand}
-                        onChange={setTestRefBrand}
+                        value={testRefWidth}
+                        onChange={setTestRefWidth}
                       />
                       <TextField
-                        label={t("settings.tester.refSize")}
+                        label={t("settings.tester.refLength")}
                         labelHidden
-                        placeholder={t("settings.tester.refSize")}
+                        type="number"
+                        placeholder={t("settings.tester.refLength")}
                         autoComplete="off"
-                        value={testRefSize}
-                        onChange={setTestRefSize}
+                        value={testRefLength}
+                        onChange={setTestRefLength}
                       />
                     </InlineGrid>
                     <Text as="span" variant="bodySm" tone="subdued">

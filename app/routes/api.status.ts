@@ -2,10 +2,31 @@ import { data, type LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { planCaps } from "../lib/plans";
+import {
+  parseStoredExtraction,
+  applyStructuredRows,
+  emptyExtraction,
+  EXTRACTION_VERSION,
+  type NormalizedSizeRow,
+} from "../lib/size-advisor.server";
 
 // Widżet czyta ten status przy każdym otwarciu strony — nie wolno go cache'ować,
 // inaczej wyłączenie w panelu nie zadziała, dopóki cache nie wygaśnie.
 const NO_CACHE = { headers: { "Cache-Control": "no-store, max-age=0" } };
+
+const GARMENT_DIM_KEYS = ["chest", "waist", "hip", "length", "inseam"] as const;
+
+/** Które wymiary ma tabela produktu — do pól ubrania referencyjnego w widżecie
+ *  (pytamy TYLKO o to, co tabela faktycznie zawiera). Wymaga ≥2 wierszy z
+ *  wartością i realnego rozrzutu (≥1 cm) — jak `spread()` w silniku. */
+function garmentDimsOf(rows: NormalizedSizeRow[]): string[] {
+  return GARMENT_DIM_KEYS.filter((key) => {
+    const vals = rows
+      .map((r) => r[key])
+      .filter((v): v is number => typeof v === "number" && v > 0);
+    return vals.length >= 2 && Math.max(...vals) - Math.min(...vals) >= 1;
+  });
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.public.appProxy(request);
@@ -22,6 +43,52 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 
     const caps = planCaps(settings?.plan);
+    const garmentMatch = Boolean(settings?.askGarmentMatch && caps.garmentMatch);
+
+    // Wymiary, o które widżet może zapytać dla TEGO produktu (pola ubrania
+    // referencyjnego) — tylko gdy funkcja włączona i mamy jakąkolwiek tabelę.
+    let garmentDims: string[] = [];
+    const productId = new URL(request.url).searchParams
+      .get("productId")
+      ?.replace(/\D/g, "");
+    if (garmentMatch && settings && productId) {
+      const productRule = await db.productRule.findUnique({
+        where: { shopId_productId: { shopId: settings.id, productId } },
+        select: {
+          extractionJson: true,
+          extractionVersion: true,
+          structuredSizeData: true,
+          sizingSystemId: true,
+        },
+      });
+      const sizingSystem = productRule?.sizingSystemId
+        ? await db.sizingSystem.findUnique({
+            where: { id: productRule.sizingSystemId },
+            select: {
+              extractionJson: true,
+              extractionVersion: true,
+              structuredSizeData: true,
+            },
+          })
+        : null;
+      const chartJson = sizingSystem
+        ? sizingSystem.extractionJson
+        : productRule?.extractionJson;
+      const chartVersion = sizingSystem
+        ? sizingSystem.extractionVersion
+        : productRule?.extractionVersion;
+      const chartStructured = sizingSystem
+        ? sizingSystem.structuredSizeData
+        : productRule?.structuredSizeData;
+      if (chartStructured || (chartJson && chartVersion === EXTRACTION_VERSION)) {
+        const base =
+          chartJson && chartVersion === EXTRACTION_VERSION
+            ? parseStoredExtraction(chartJson)
+            : null;
+        const extraction = applyStructuredRows(base ?? emptyExtraction(), chartStructured);
+        garmentDims = garmentDimsOf(extraction.rows);
+      }
+    }
 
     // Świeżo zainstalowana apka nie ma jeszcze wiersza ShopSettings — domyślnie
     // włączona (żeby przycisk pojawił się od razu), plan free.
@@ -30,7 +97,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       addToCart: caps.addToCartButton,
       poweredBy: !caps.removeBranding,
       fitPreference: Boolean(settings?.askFitPreference && caps.fitPreference),
-      garmentMatch: Boolean(settings?.askGarmentMatch && caps.garmentMatch),
+      garmentMatch,
+      // Puste = ta tabela nie ma z czym porównać ubranie referencyjne (brak
+      // tabeli, albo produkt nieodzieżowy) → widżet chowa sekcję.
+      garmentDims,
       // „Mój rozmiar: X" bez ponownego wypełniania — auto-przeliczenie dla
       // nowych produktów tylko na planach z tą funkcją (patrz planCaps).
       autoSize: caps.autoSize,

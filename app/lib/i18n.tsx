@@ -380,7 +380,7 @@ const messages: Record<Locale, Record<string, string>> = {
 
     "settings.garment.title": "Dopasuj do ubrania, które klient ma",
     "settings.garment.desc":
-      "Dodaje w widżecie opcjonalne, rozwijane pytanie: klient podaje markę i rozmiar ubrania tego samego typu, które leży na nim idealnie. AI porównuje ubranie do ubrania (nie liczy obwodu ciała) i wskazuje rozmiar z tabeli tego produktu, który leżałby podobnie. Plan Growth i wyższy.",
+      "Dodaje w widżecie opcjonalne, rozwijane pole: klient podaje wymiary (na płasko, w cm) ubrania tego samego typu, które leży na nim idealnie. Silnik porównuje te liczby z tabelą produktu (bez AI, bez zgadywania marek) i wskazuje najbardziej podobny rozmiar. Pole pyta tylko o wymiary, które produkt faktycznie ma w tabeli. Plan Growth i wyższy.",
     "settings.garment.toggle": "Pytaj klienta o dobrze leżące ubranie",
 
     "settings.returnRate.title": "Twój ogólny wskaźnik zwrotów",
@@ -440,10 +440,10 @@ const messages: Record<Locale, Record<string, string>> = {
     "settings.tester.noBrand":
       "Notatki o marce (Ustawienia) są puste — nie wpłynęły na wynik.",
     "settings.tester.ref": "Ubranie referencyjne (opcjonalnie)",
-    "settings.tester.refBrand": "Marka",
-    "settings.tester.refSize": "Rozmiar (np. M lub 32)",
+    "settings.tester.refWidth": "Szerokość na płasko, cm (klatka/pas)",
+    "settings.tester.refLength": "Długość, cm",
     "settings.tester.refHint":
-      "Symuluje klienta, który podał dobrze leżące ubranie tego samego typu. Zostaw puste, aby pominąć.",
+      "Symuluje klienta, który podał wymiary dobrze leżącego ubrania tego samego typu (na płasko, w cm). Zostaw puste, aby pominąć.",
     "settings.error.saveFailed": "Nie udało się zapisać.",
     "settings.error.testFailed": "Nie udało się wykonać testu.",
 
@@ -800,7 +800,7 @@ const messages: Record<Locale, Record<string, string>> = {
 
     "settings.garment.title": "Match a garment the shopper owns",
     "settings.garment.desc":
-      "Adds an optional, collapsible question in the widget: the shopper enters the brand and size of a garment of the same type that fits them perfectly. The AI compares garment to garment (it does not estimate body girth) and picks the size in this product's chart that would fit most similarly. Growth plan and up.",
+      "Adds an optional, collapsible field in the widget: the shopper enters flat measurements (in cm) of a garment of the same type that fits them perfectly. The engine compares those numbers against this product's chart directly (no AI, no brand guessing) and picks the closest size. Only asks for measurements this product's chart actually has. Growth plan and up.",
     "settings.garment.toggle": "Ask the shopper for a well-fitting garment",
 
     "settings.returnRate.title": "Your overall return rate",
@@ -860,10 +860,10 @@ const messages: Record<Locale, Record<string, string>> = {
     "settings.tester.noBrand":
       "Brand style notes (Settings) are empty — they didn't affect the result.",
     "settings.tester.ref": "Reference garment (optional)",
-    "settings.tester.refBrand": "Brand",
-    "settings.tester.refSize": "Size (e.g. M or 32)",
+    "settings.tester.refWidth": "Flat width, cm (chest/waist)",
+    "settings.tester.refLength": "Length, cm",
     "settings.tester.refHint":
-      "Simulates a shopper who named a well-fitting garment of the same type. Leave blank to skip.",
+      "Simulates a shopper who gave the flat measurements (in cm) of a well-fitting garment of the same type. Leave blank to skip.",
     "settings.error.saveFailed": "Could not save.",
     "settings.error.testFailed": "Could not run the test.",
 
