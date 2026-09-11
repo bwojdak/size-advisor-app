@@ -278,6 +278,12 @@ export default function ProductsConfig() {
   // (patrz efekt niżej) — nie robimy tego drugi raz dla tego samego produktu
   // w tej sesji, żeby nie nadpisywać świadomie wyczyszczonej tabeli.
   const [autoFilledFor, setAutoFilledFor] = useState<string | null>(null);
+  // true tylko, gdy w momencie otwarcia edytora produkt NIE miał jeszcze
+  // żadnej analizy AI — auto-fill ma sens wyłącznie dla świeżo skonfigurowanego
+  // produktu (pierwszy zapis dopiero co odpalił analizę). Dla produktu, który
+  // już był analizowany wcześniej, wyczyszczenie siatki do zera w trakcie tej
+  // sesji ma zostać wyczyszczone, nie zastąpione starą analizą.
+  const [autoFillEligible, setAutoFillEligible] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"save" | "delete" | null>(null);
@@ -325,7 +331,17 @@ export default function ProductsConfig() {
       const suggested = rowsToGrid(extractionRows);
       setSuggestedRows(suggested);
       const structured = structuredByProduct[productId];
-      setGridRows(structured ? rowsToGrid(structured) : suggested);
+      // WAŻNE: brak zweryfikowanej siatki NIE podstawia tu automatycznie
+      // sugestii AI — pusta siatka ma prawo zostać pusta (np. admin świadomie
+      // wyczyścił wszystkie wymiary i zapisał). Podstawianie za każdym razem
+      // starej analizy AI wyglądało z zewnątrz jak dane same wracające po
+      // otwarciu edytora. Sugestię AI dostaje się tylko explicit klikiem
+      // „Wypełnij z ostatniej analizy AI" albo jednorazowym auto-fillem
+      // niżej — a ten dotyczy wyłącznie NOWEGO produktu bez wcześniejszej
+      // analizy (patrz autoFillEligible).
+      setGridRows(structured ? rowsToGrid(structured) : []);
+      setAutoFillEligible(extractions[productId]?.state !== "ok");
+      setAutoFilledFor(null);
     },
     [rulesById, extractions, structuredByProduct],
   );
@@ -338,9 +354,12 @@ export default function ProductsConfig() {
   // by zamknąć i otworzyć edytor jeszcze raz, żeby zobaczyć przycisk
   // "Wypełnij z ostatniej analizy AI". Nadal NIE zapisujemy tego automatycznie
   // do bazy — to tylko wypełnienie formularza, admin i tak musi kliknąć
-  // Zapisz, żeby to zatwierdzić jako zweryfikowaną tabelę.
+  // Zapisz, żeby to zatwierdzić jako zweryfikowaną tabelę. `autoFillEligible`
+  // (ustawiane raz, przy otwarciu edytora) pilnuje, żeby to NIE odpaliło się
+  // też dla już skonfigurowanego produktu, którego admin świadomie wyczyścił
+  // do zera w trakcie tej sesji — inaczej stara analiza wracałaby sama.
   useEffect(() => {
-    if (!editing) return;
+    if (!editing || !autoFillEligible) return;
     if (gridRows.length > 0) return;
     if (autoFilledFor === editing.productId) return;
     const ext = extractions[editing.productId];
@@ -350,7 +369,7 @@ export default function ProductsConfig() {
     setGridRows(suggested);
     setAutoFilledFor(editing.productId);
     toast(t("products.extraction.autoFilledGrid"));
-  }, [editing, extractions, gridRows.length, autoFilledFor, t]);
+  }, [editing, extractions, gridRows.length, autoFilledFor, autoFillEligible, t]);
 
   const openPicker = useCallback(async () => {
     const api = (window as unknown as {

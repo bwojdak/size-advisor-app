@@ -241,9 +241,12 @@ export default function SizingSystemsPage() {
       name: s.name,
       parsedSizeData: s.parsedSizeData,
       customNotes: s.customNotes,
-      gridRows: s.structuredRows.length
-        ? rowsToGrid(s.structuredRows)
-        : suggestedRows,
+      // Brak zweryfikowanej siatki NIE podstawia tu automatycznie sugestii
+      // AI — pusta siatka ma prawo zostać pusta (np. admin świadomie
+      // wyczyścił wszystkie wymiary i zapisał). Podstawianie starej analizy
+      // przy każdym otwarciu wyglądało jak dane same wracające. Sugestię AI
+      // dostaje się tylko explicit klikiem „Wypełnij z ostatniej analizy AI".
+      gridRows: s.structuredRows.length ? rowsToGrid(s.structuredRows) : [],
       suggestedRows,
       category: s.extraction.state === "ok" ? s.extraction.summary.category : null,
     });

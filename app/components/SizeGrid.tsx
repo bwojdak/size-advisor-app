@@ -127,14 +127,23 @@ export function SizeGrid({
   // po zamknięciu i otwarciu edytora, mimo że zapisana wartość dalej tam
   // jest — wyglądało to jak utrata danych.
   const [visibleDims, setVisibleDims] = useState<Array<keyof GridRow>>(() => {
-    const allowed = category ? DIMS_BY_CATEGORY[category] : null;
-    const base = allowed
-      ? ALL_COLS.map((c) => c.key).filter((k) => allowed.includes(k))
-      : ALL_COLS.map((c) => c.key);
     const withData = ALL_COLS.map((c) => c.key).filter((k) =>
       rows.some((r) => r[k].trim()),
     );
-    return Array.from(new Set([...base, ...withData]));
+    // Domyślny zestaw z kategorii (np. pas/biodra/nogawka dla dołu) doradzamy
+    // TYLKO wtedy, gdy ta tabela jeszcze nigdy nie miała żadnych realnych
+    // danych — czyli faktycznie nowy produkt, zanim cokolwiek zapisano. Gdy
+    // tabela już kiedyś miała dane (nawet jeśli admin właśnie wszystko
+    // wyczyścił), kategoria NIE wymusza już z powrotem swoich domyślnych
+    // kolumn — inaczej „typowego dla kategorii" wymiaru (np. pas dla
+    // spodni) w ogóle nie dałoby się trwale usunąć: znikałaby tylko wartość,
+    // a nagłówek i tak wracałby po każdym ponownym otwarciu edytora.
+    const hasAnyData = withData.length > 0;
+    if (hasAnyData) return withData;
+    const allowed = category ? DIMS_BY_CATEGORY[category] : null;
+    return allowed
+      ? ALL_COLS.map((c) => c.key).filter((k) => allowed.includes(k))
+      : ALL_COLS.map((c) => c.key);
   });
   const COLS = ALL_COLS.filter((c) => visibleDims.includes(c.key));
   const hiddenCols = ALL_COLS.filter((c) => !visibleDims.includes(c.key));
