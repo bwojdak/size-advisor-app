@@ -82,6 +82,8 @@ const messages: Record<Locale, Record<string, string>> = {
       "{names} zwykle nie dotyczy kategorii „{category}” — sprawdź, czy to zamierzone.",
     "grid.incompleteCols": "Brakuje wartości: {details}.",
     "grid.prefillFromAi": "Wypełnij z ostatniej analizy AI",
+    "grid.verifyToast":
+      "Wypełniono danymi z analizy AI — sprawdź liczby przed zapisem, AI mogło się pomylić.",
     "grid.verifiedBadge": "Zweryfikowana siatka",
     "sizingSystems.notesLabel": "Notatki dla AI (opcjonalnie)",
     "sizingSystems.notesHelp":
@@ -512,6 +514,8 @@ const messages: Record<Locale, Record<string, string>> = {
       "{names} doesn't usually apply to the “{category}” category — check this is intentional.",
     "grid.incompleteCols": "Missing values: {details}.",
     "grid.prefillFromAi": "Fill from the latest AI analysis",
+    "grid.verifyToast":
+      "Filled from the AI analysis — check the numbers before saving, the AI may have gotten something wrong.",
     "grid.verifiedBadge": "Verified grid",
     "sizingSystems.notesLabel": "Notes for the AI (optional)",
     "sizingSystems.notesHelp":

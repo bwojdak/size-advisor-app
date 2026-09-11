@@ -578,9 +578,10 @@ export default function SizingSystemsPage() {
                   <Button
                     size="slim"
                     variant="plain"
-                    onClick={() =>
-                      setEditing((e) => (e ? { ...e, gridRows: suggestedRows } : e))
-                    }
+                    onClick={() => {
+                      setEditing((e) => (e ? { ...e, gridRows: suggestedRows } : e));
+                      toast(t("grid.verifyToast"));
+                    }}
                   >
                     {t("grid.prefillFromAi")}
                   </Button>

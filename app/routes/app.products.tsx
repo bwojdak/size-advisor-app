@@ -938,7 +938,10 @@ export default function ProductsConfig() {
                   <Button
                     size="slim"
                     variant="plain"
-                    onClick={() => setGridRows(suggestedRows)}
+                    onClick={() => {
+                      setGridRows(suggestedRows);
+                      toast(t("grid.verifyToast"));
+                    }}
                   >
                     {t("grid.prefillFromAi")}
                   </Button>
