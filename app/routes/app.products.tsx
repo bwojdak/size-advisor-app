@@ -1,11 +1,4 @@
-import {
-  type ChangeEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type ChangeEvent, useCallback, useMemo, useRef, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link, useLoaderData, useRevalidator } from "react-router";
 import {
@@ -274,16 +267,6 @@ export default function ProductsConfig() {
   const [sizeText, setSizeText] = useState("");
   const [gridRows, setGridRows] = useState<GridRow[]>([]);
   const [suggestedRows, setSuggestedRows] = useState<GridRow[]>([]);
-  // Produkt, dla którego już podstawiliśmy tabelę z analizy AI automatycznie
-  // (patrz efekt niżej) — nie robimy tego drugi raz dla tego samego produktu
-  // w tej sesji, żeby nie nadpisywać świadomie wyczyszczonej tabeli.
-  const [autoFilledFor, setAutoFilledFor] = useState<string | null>(null);
-  // true tylko, gdy w momencie otwarcia edytora produkt NIE miał jeszcze
-  // żadnej analizy AI — auto-fill ma sens wyłącznie dla świeżo skonfigurowanego
-  // produktu (pierwszy zapis dopiero co odpalił analizę). Dla produktu, który
-  // już był analizowany wcześniej, wyczyszczenie siatki do zera w trakcie tej
-  // sesji ma zostać wyczyszczone, nie zastąpione starą analizą.
-  const [autoFillEligible, setAutoFillEligible] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"save" | "delete" | null>(null);
@@ -293,24 +276,6 @@ export default function ProductsConfig() {
     () => new Map(rules.map((r) => [r.productId, r])),
     [rules],
   );
-  // Produkty, dla których w trakcie życia tej strony widzieliśmy CHOĆ RAZ
-  // niepustą zweryfikowaną tabelę — pamiętamy same ETYKIETY rozmiarów (S/M/L…),
-  // NIE liczby. Odróżnia "produkt świeżo skonfigurowany, nigdy nie miał
-  // tabeli" (fallback na sugestię AI jest wygodny i bezpieczny) od "admin
-  // świadomie wyczyścił wcześniej zapisaną tabelę do zera" (fallback na starą
-  // sugestię AI wyglądałby jak dane same wracające, patrz d1f8908) — ale w
-  // TYM drugim przypadku wciąż podstawiamy puste wiersze z zapamiętanymi
-  // rozmiarami zamiast zupełnie pustej tabeli: inaczej po zapisaniu "same
-  // puste" (gridToPayload usuwa wiersze bez ŻADNEGO wymiaru) nie było jak
-  // dodać wymiaru z powrotem — tabela w ogóle się nie renderowała (0 wierszy),
-  // więc „+ Dodaj wymiar” wyglądało, jakby nic nie robiło (patrz 7068e29).
-  const seenStructuredRef = useRef<Map<string, NormalizedSizeRow[]>>(new Map());
-  useEffect(() => {
-    for (const pid of Object.keys(structuredByProduct)) {
-      const rows = structuredByProduct[pid];
-      if (rows?.length) seenStructuredRef.current.set(pid, rows);
-    }
-  }, [structuredByProduct]);
   const systemNameById = useMemo(
     () => new Map(sizingSystems.map((s) => [s.id, s.name])),
     [sizingSystems],
@@ -349,62 +314,15 @@ export default function ProductsConfig() {
       const suggested = rowsToGrid(extractionRows);
       setSuggestedRows(suggested);
       const structured = structuredByProduct[productId];
-      const lastSeen = seenStructuredRef.current.get(productId);
-      // Brak zweryfikowanej siatki TERAZ nie zawsze znaczy to samo: dla
-      // produktu, który jeszcze nigdy jej nie miał, podstawienie sugestii AI
-      // jako startowego szkicu jest wygodne (i konieczne — inaczej tabela
-      // startowałaby z 0 wierszami, których nie da się zapisać, patrz
-      // gridToPayload). Dla produktu, który tabelę kiedyś MIAŁ, a admin
-      // świadomie wyczyścił ją do zera i zapisał — podstawianie starej
-      // sugestii z powrotem wyglądałoby jak dane same wracające (d1f8908),
-      // ale zupełnie pusta tabela (0 wierszy) to ślepy zaułek: nie da się do
-      // niej nic dodać, bo tabela w ogóle się nie renderuje. Zostają więc
-      // rozmiary (S/M/L…) z wyzerowanymi wymiarami — szkielet do wypełnienia
-      // na nowo, bez wskrzeszania starych liczb.
-      setGridRows(
-        structured
-          ? rowsToGrid(structured)
-          : lastSeen
-            ? rowsToGrid(lastSeen).map((r) => ({
-                ...r,
-                chest: "",
-                waist: "",
-                hip: "",
-                length: "",
-                inseam: "",
-              }))
-            : suggested,
-      );
-      setAutoFillEligible(extractions[productId]?.state !== "ok");
-      setAutoFilledFor(null);
+      // Prosta, przewidywalna zasada: tabela pokazuje dokładnie to, co jest
+      // zapisane — albo nic. Żadnego zgadywania/auto-podstawiania w tle.
+      // Sugestię z ostatniej analizy AI dostaje się WYŁĄCZNIE explicit
+      // kliknięciem „Wypełnij z ostatniej analizy AI" niżej — admin sam
+      // decyduje, kiedy (i czy w ogóle) chce ją wciągnąć do edycji.
+      setGridRows(structured ? rowsToGrid(structured) : []);
     },
     [rulesById, extractions, structuredByProduct],
   );
-
-  // Zdjęcie/opis dodane do NOWEGO produktu (bez wcześniejszej analizy) nie
-  // ma jeszcze sugerowanych wierszy w momencie otwarcia edytora — pojawiają
-  // się dopiero po zapisie, który w tle odpala analizę AI. Skoro okno zostaje
-  // teraz otwarte po zapisie (patrz save()), gdy ta analiza dojedzie i tabela
-  // wciąż jest pusta, podstawiamy jej wyniki automatycznie — bez tego trzeba
-  // by zamknąć i otworzyć edytor jeszcze raz, żeby zobaczyć przycisk
-  // "Wypełnij z ostatniej analizy AI". Nadal NIE zapisujemy tego automatycznie
-  // do bazy — to tylko wypełnienie formularza, admin i tak musi kliknąć
-  // Zapisz, żeby to zatwierdzić jako zweryfikowaną tabelę. `autoFillEligible`
-  // (ustawiane raz, przy otwarciu edytora) pilnuje, żeby to NIE odpaliło się
-  // też dla już skonfigurowanego produktu, którego admin świadomie wyczyścił
-  // do zera w trakcie tej sesji — inaczej stara analiza wracałaby sama.
-  useEffect(() => {
-    if (!editing || !autoFillEligible) return;
-    if (gridRows.length > 0) return;
-    if (autoFilledFor === editing.productId) return;
-    const ext = extractions[editing.productId];
-    if (ext?.state !== "ok" || ext.summary.rows.length === 0) return;
-    const suggested = rowsToGrid(ext.summary.rows);
-    setSuggestedRows(suggested);
-    setGridRows(suggested);
-    setAutoFilledFor(editing.productId);
-    toast(t("products.extraction.autoFilledGrid"));
-  }, [editing, extractions, gridRows.length, autoFilledFor, autoFillEligible, t]);
 
   const openPicker = useCallback(async () => {
     const api = (window as unknown as {

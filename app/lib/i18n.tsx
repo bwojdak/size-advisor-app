@@ -302,8 +302,6 @@ const messages: Record<Locale, Record<string, string>> = {
     "products.extraction.title": "Co zrozumiała AI",
     "products.extraction.reanalyze": "Przeanalizuj ponownie",
     "products.extraction.reanalyzed": "Produkt przeanalizowany ponownie",
-    "products.extraction.autoFilledGrid":
-      "Tabela wypełniona automatycznie z nowej analizy AI — sprawdź liczby przed zapisem.",
     "products.extraction.reanalyzeFailed": "Nie udało się przeanalizować teraz",
     "products.extraction.help":
       "Analiza robiona raz przy zapisie i używana przy każdym zapytaniu bez wołania modelu. Zmień tabelę / opis i zapisz, albo kliknij „Przeanalizuj ponownie”.",
@@ -732,8 +730,6 @@ const messages: Record<Locale, Record<string, string>> = {
     "products.extraction.title": "What the AI understood",
     "products.extraction.reanalyze": "Re-analyze",
     "products.extraction.reanalyzed": "Product re-analyzed",
-    "products.extraction.autoFilledGrid":
-      "Table auto-filled from the new AI analysis — check the numbers before saving.",
     "products.extraction.reanalyzeFailed": "Could not analyze right now",
     "products.extraction.help":
       "Analyzed once on save and reused on every request without calling the model. Change the chart / description and save, or hit “Re-analyze”.",
