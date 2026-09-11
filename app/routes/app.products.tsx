@@ -294,17 +294,21 @@ export default function ProductsConfig() {
     [rules],
   );
   // Produkty, dla których w trakcie życia tej strony widzieliśmy CHOĆ RAZ
-  // niepustą zweryfikowaną tabelę — odróżnia "produkt świeżo skonfigurowany,
-  // nigdy nie miał tabeli" (fallback na sugestię AI jest wygodny i bezpieczny)
-  // od "admin świadomie wyczyścił wcześniej zapisaną tabelę do zera" (fallback
-  // na starą sugestię AI wyglądałby jak dane same wracające, patrz d1f8908).
-  // Bez tego rozróżnienia jedyną alternatywą było zawsze zaczynać od pustej
-  // tabeli — co dla NOWEGO produktu oznaczało 0 wierszy do edycji i ciche
-  // niezapisanie niczego (gridToPayload wymaga ≥2 wierszy).
-  const seenStructuredRef = useRef<Set<string>>(new Set());
+  // niepustą zweryfikowaną tabelę — pamiętamy same ETYKIETY rozmiarów (S/M/L…),
+  // NIE liczby. Odróżnia "produkt świeżo skonfigurowany, nigdy nie miał
+  // tabeli" (fallback na sugestię AI jest wygodny i bezpieczny) od "admin
+  // świadomie wyczyścił wcześniej zapisaną tabelę do zera" (fallback na starą
+  // sugestię AI wyglądałby jak dane same wracające, patrz d1f8908) — ale w
+  // TYM drugim przypadku wciąż podstawiamy puste wiersze z zapamiętanymi
+  // rozmiarami zamiast zupełnie pustej tabeli: inaczej po zapisaniu "same
+  // puste" (gridToPayload usuwa wiersze bez ŻADNEGO wymiaru) nie było jak
+  // dodać wymiaru z powrotem — tabela w ogóle się nie renderowała (0 wierszy),
+  // więc „+ Dodaj wymiar” wyglądało, jakby nic nie robiło (patrz 7068e29).
+  const seenStructuredRef = useRef<Map<string, NormalizedSizeRow[]>>(new Map());
   useEffect(() => {
     for (const pid of Object.keys(structuredByProduct)) {
-      if (structuredByProduct[pid]?.length) seenStructuredRef.current.add(pid);
+      const rows = structuredByProduct[pid];
+      if (rows?.length) seenStructuredRef.current.set(pid, rows);
     }
   }, [structuredByProduct]);
   const systemNameById = useMemo(
@@ -345,6 +349,7 @@ export default function ProductsConfig() {
       const suggested = rowsToGrid(extractionRows);
       setSuggestedRows(suggested);
       const structured = structuredByProduct[productId];
+      const lastSeen = seenStructuredRef.current.get(productId);
       // Brak zweryfikowanej siatki TERAZ nie zawsze znaczy to samo: dla
       // produktu, który jeszcze nigdy jej nie miał, podstawienie sugestii AI
       // jako startowego szkicu jest wygodne (i konieczne — inaczej tabela
@@ -352,12 +357,22 @@ export default function ProductsConfig() {
       // gridToPayload). Dla produktu, który tabelę kiedyś MIAŁ, a admin
       // świadomie wyczyścił ją do zera i zapisał — podstawianie starej
       // sugestii z powrotem wyglądałoby jak dane same wracające (d1f8908),
-      // więc wtedy zostaje naprawdę pusta.
+      // ale zupełnie pusta tabela (0 wierszy) to ślepy zaułek: nie da się do
+      // niej nic dodać, bo tabela w ogóle się nie renderuje. Zostają więc
+      // rozmiary (S/M/L…) z wyzerowanymi wymiarami — szkielet do wypełnienia
+      // na nowo, bez wskrzeszania starych liczb.
       setGridRows(
         structured
           ? rowsToGrid(structured)
-          : seenStructuredRef.current.has(productId)
-            ? []
+          : lastSeen
+            ? rowsToGrid(lastSeen).map((r) => ({
+                ...r,
+                chest: "",
+                waist: "",
+                hip: "",
+                length: "",
+                inseam: "",
+              }))
             : suggested,
       );
       setAutoFillEligible(extractions[productId]?.state !== "ok");

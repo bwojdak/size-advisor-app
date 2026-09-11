@@ -225,15 +225,18 @@ export default function SizingSystemsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Systemy, dla których w trakcie życia tej strony widzieliśmy choć raz
-  // niepustą zweryfikowaną tabelę — odróżnia "nowy system, nigdy nie miał
-  // tabeli" (sugestia AI jako startowy szkic jest wygodna i bezpieczna) od
-  // "admin świadomie wyczyścił wcześniej zapisaną tabelę do zera" (wtedy
-  // podstawienie starej sugestii z powrotem wyglądałoby jak dane same
-  // wracające). Patrz analogiczny komentarz w app.products.tsx.
-  const seenStructuredRef = useRef<Set<string>>(new Set());
+  // niepustą zweryfikowaną tabelę — pamiętamy same ETYKIETY rozmiarów, nie
+  // liczby. Odróżnia "nowy system, nigdy nie miał tabeli" (sugestia AI jako
+  // startowy szkic jest wygodna i bezpieczna) od "admin świadomie wyczyścił
+  // wcześniej zapisaną tabelę do zera" — w tym drugim przypadku wciąż
+  // podstawiamy puste wiersze z zapamiętanymi rozmiarami zamiast zupełnie
+  // pustej tabeli, bo 0 wierszy to ślepy zaułek (tabela się nie renderuje,
+  // "+ Dodaj wymiar" nie ma gdzie nic pokazać). Patrz analogiczny komentarz
+  // w app.products.tsx.
+  const seenStructuredRef = useRef<Map<string, NormalizedSizeRow[]>>(new Map());
   useEffect(() => {
     for (const s of systems) {
-      if (s.structuredRows.length) seenStructuredRef.current.add(s.id);
+      if (s.structuredRows.length) seenStructuredRef.current.set(s.id, s.structuredRows);
     }
   }, [systems]);
 
@@ -249,6 +252,7 @@ export default function SizingSystemsPage() {
     });
   const openEdit = (s: SystemView) => {
     const suggestedRows = rowsToGrid(s.suggestedRows);
+    const lastSeen = seenStructuredRef.current.get(s.id);
     setEditing({
       id: s.id,
       name: s.name,
@@ -256,8 +260,15 @@ export default function SizingSystemsPage() {
       customNotes: s.customNotes,
       gridRows: s.structuredRows.length
         ? rowsToGrid(s.structuredRows)
-        : seenStructuredRef.current.has(s.id)
-          ? []
+        : lastSeen
+          ? rowsToGrid(lastSeen).map((r) => ({
+              ...r,
+              chest: "",
+              waist: "",
+              hip: "",
+              length: "",
+              inseam: "",
+            }))
           : suggestedRows,
       suggestedRows,
       category: s.extraction.state === "ok" ? s.extraction.summary.category : null,
