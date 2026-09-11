@@ -67,6 +67,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "grid.title": "Zweryfikowana tabela rozmiarów",
     "grid.help":
       "Wpisz dokładne wymiary per rozmiar — to nadpisuje odczyt AI i eliminuje pomyłki w tabeli (np. pomylony obwód z połową obwodu). Klatkę/pas/biodra możesz podać na płasko (pacha–pacha, tak jak zwykle jest na metce) albo jako pełny obwód — rozpoznamy automatycznie po wielkości liczb, nie musisz przeliczać. Kolumny to zamknięta lista standardowych punktów pomiarowych branży odzieżowej — dodawaj/usuwaj wg produktu. Zostaw puste pole, jeśli wymiar nie dotyczy.",
+    "grid.examplePrefix": "np.",
     "grid.col.size": "Rozmiar",
     "grid.col.chest": "Klatka",
     "grid.col.waist": "Pas",

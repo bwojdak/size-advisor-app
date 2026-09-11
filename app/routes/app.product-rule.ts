@@ -62,7 +62,13 @@ async function runExtraction(
       productTitle: rule.productTitle || null,
       productDescription,
       brandStyleNotes: opts.brandStyleNotes,
-      productSizeData: rule.parsedSizeData || null,
+      // `parsedSizeData` (stare pole "Opis dla AI" z wklejoną tabelą) nie ma
+      // już swojego pola w edytorze — zastąpiła je zweryfikowana siatka +
+      // "Notatki dla AI". Kolumna w bazie zostaje (nie kasujemy cudzych
+      // danych bez pytania), ale przestajemy ją wysyłać do analizy: inaczej
+      // stara, niewidoczna i niemożliwa do wyczyszczenia wartość sprzed tej
+      // zmiany wpływałaby na wynik "Przeanalizuj ponownie" w nieskończoność.
+      productSizeData: null,
       productNotes: rule.customNotes || null,
       sizeChartImage: useImage ? rule.sizeChartImage : null,
       hasSizeChartImage: useImage,

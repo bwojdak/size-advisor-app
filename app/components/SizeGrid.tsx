@@ -203,7 +203,19 @@ export function SizeGrid({
   ]);
 
   return (
-    <BlockStack gap="150">
+    <div className="sa-grid">
+      {/* Polaris nie daje sposobu, żeby ostylować placeholder TextField przez
+          prop — a sam kolor przeglądarki bywa za mało wyraźny, żeby na
+          pierwszy rzut oka odróżnić PRZYKŁADOWĄ liczbę od realnie wpisanej.
+          Stąd wymuszony, wyraźnie szary + kursywa placeholder w całej siatce. */}
+      <style>{`
+        .sa-grid input::placeholder {
+          color: #8a8a8a;
+          opacity: 1;
+          font-style: italic;
+        }
+      `}</style>
+      <BlockStack gap="150">
       <InlineStack align="space-between" blockAlign="center">
         <Text as="span" variant="bodyMd" fontWeight="medium">
           {t("grid.title")}
@@ -362,7 +374,7 @@ export function SizeGrid({
                         value={cmToDisplay(row[c.key], unit)}
                         onChange={(v) => setCell(i, c.key, displayToCm(v, unit))}
                         autoComplete="off"
-                        placeholder={cmToDisplay(c.ph, unit)}
+                        placeholder={`${t("grid.examplePrefix")} ${cmToDisplay(c.ph, unit)}`}
                         size="slim"
                       />
                     </div>
@@ -386,6 +398,7 @@ export function SizeGrid({
           {t("grid.addRow")}
         </Button>
       </InlineStack>
-    </BlockStack>
+      </BlockStack>
+    </div>
   );
 }

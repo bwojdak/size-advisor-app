@@ -33,7 +33,11 @@ async function runSystemExtraction(
       productTitle: system.name || null,
       productDescription: null,
       brandStyleNotes: opts.brandStyleNotes,
-      productSizeData: system.parsedSizeData || null,
+      // Patrz analogiczny komentarz w app.product-rule.ts: `parsedSizeData`
+      // nie ma już swojego pola w edytorze systemu, więc nie zasila analizy —
+      // inaczej stara, niewidoczna wartość sprzed zmiany wpływałaby na wynik
+      // "Przeanalizuj ponownie" bez możliwości jej wyczyszczenia z panelu.
+      productSizeData: null,
       productNotes: system.customNotes || null,
       sizeChartImage: null,
       hasSizeChartImage: false,
