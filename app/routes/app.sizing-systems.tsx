@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useRevalidator } from "react-router";
 import {
@@ -224,6 +224,19 @@ export default function SizingSystemsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Systemy, dla których w trakcie życia tej strony widzieliśmy choć raz
+  // niepustą zweryfikowaną tabelę — odróżnia "nowy system, nigdy nie miał
+  // tabeli" (sugestia AI jako startowy szkic jest wygodna i bezpieczna) od
+  // "admin świadomie wyczyścił wcześniej zapisaną tabelę do zera" (wtedy
+  // podstawienie starej sugestii z powrotem wyglądałoby jak dane same
+  // wracające). Patrz analogiczny komentarz w app.products.tsx.
+  const seenStructuredRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const s of systems) {
+      if (s.structuredRows.length) seenStructuredRef.current.add(s.id);
+    }
+  }, [systems]);
+
   const openNew = () =>
     setEditing({
       id: null,
@@ -241,12 +254,11 @@ export default function SizingSystemsPage() {
       name: s.name,
       parsedSizeData: s.parsedSizeData,
       customNotes: s.customNotes,
-      // Brak zweryfikowanej siatki NIE podstawia tu automatycznie sugestii
-      // AI — pusta siatka ma prawo zostać pusta (np. admin świadomie
-      // wyczyścił wszystkie wymiary i zapisał). Podstawianie starej analizy
-      // przy każdym otwarciu wyglądało jak dane same wracające. Sugestię AI
-      // dostaje się tylko explicit klikiem „Wypełnij z ostatniej analizy AI".
-      gridRows: s.structuredRows.length ? rowsToGrid(s.structuredRows) : [],
+      gridRows: s.structuredRows.length
+        ? rowsToGrid(s.structuredRows)
+        : seenStructuredRef.current.has(s.id)
+          ? []
+          : suggestedRows,
       suggestedRows,
       category: s.extraction.state === "ok" ? s.extraction.summary.category : null,
     });

@@ -293,6 +293,20 @@ export default function ProductsConfig() {
     () => new Map(rules.map((r) => [r.productId, r])),
     [rules],
   );
+  // Produkty, dla których w trakcie życia tej strony widzieliśmy CHOĆ RAZ
+  // niepustą zweryfikowaną tabelę — odróżnia "produkt świeżo skonfigurowany,
+  // nigdy nie miał tabeli" (fallback na sugestię AI jest wygodny i bezpieczny)
+  // od "admin świadomie wyczyścił wcześniej zapisaną tabelę do zera" (fallback
+  // na starą sugestię AI wyglądałby jak dane same wracające, patrz d1f8908).
+  // Bez tego rozróżnienia jedyną alternatywą było zawsze zaczynać od pustej
+  // tabeli — co dla NOWEGO produktu oznaczało 0 wierszy do edycji i ciche
+  // niezapisanie niczego (gridToPayload wymaga ≥2 wierszy).
+  const seenStructuredRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const pid of Object.keys(structuredByProduct)) {
+      if (structuredByProduct[pid]?.length) seenStructuredRef.current.add(pid);
+    }
+  }, [structuredByProduct]);
   const systemNameById = useMemo(
     () => new Map(sizingSystems.map((s) => [s.id, s.name])),
     [sizingSystems],
@@ -331,15 +345,21 @@ export default function ProductsConfig() {
       const suggested = rowsToGrid(extractionRows);
       setSuggestedRows(suggested);
       const structured = structuredByProduct[productId];
-      // WAŻNE: brak zweryfikowanej siatki NIE podstawia tu automatycznie
-      // sugestii AI — pusta siatka ma prawo zostać pusta (np. admin świadomie
-      // wyczyścił wszystkie wymiary i zapisał). Podstawianie za każdym razem
-      // starej analizy AI wyglądało z zewnątrz jak dane same wracające po
-      // otwarciu edytora. Sugestię AI dostaje się tylko explicit klikiem
-      // „Wypełnij z ostatniej analizy AI" albo jednorazowym auto-fillem
-      // niżej — a ten dotyczy wyłącznie NOWEGO produktu bez wcześniejszej
-      // analizy (patrz autoFillEligible).
-      setGridRows(structured ? rowsToGrid(structured) : []);
+      // Brak zweryfikowanej siatki TERAZ nie zawsze znaczy to samo: dla
+      // produktu, który jeszcze nigdy jej nie miał, podstawienie sugestii AI
+      // jako startowego szkicu jest wygodne (i konieczne — inaczej tabela
+      // startowałaby z 0 wierszami, których nie da się zapisać, patrz
+      // gridToPayload). Dla produktu, który tabelę kiedyś MIAŁ, a admin
+      // świadomie wyczyścił ją do zera i zapisał — podstawianie starej
+      // sugestii z powrotem wyglądałoby jak dane same wracające (d1f8908),
+      // więc wtedy zostaje naprawdę pusta.
+      setGridRows(
+        structured
+          ? rowsToGrid(structured)
+          : seenStructuredRef.current.has(productId)
+            ? []
+            : suggested,
+      );
       setAutoFillEligible(extractions[productId]?.state !== "ok");
       setAutoFilledFor(null);
     },
