@@ -87,7 +87,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "grid.verifiedBadge": "Zweryfikowana siatka",
     "consistency.title": "Test spójności tabeli",
     "consistency.checking": "Sprawdzanie na sylwetkach testowych…",
-    "consistency.ok": "Spójna na {n} przetestowanych sylwetkach — przy rosnącym wzroście/wadze rozmiar nigdzie się nie cofa.",
+    "consistency.ok": "Spójna na {n} przetestowanych sylwetkach.",
     "consistency.issues": "{n} niespójności — sprawdź te miejsca w tabeli:",
     "consistency.issue":
       "{axis} {from}→{to} ({gender}, {build}): rozmiar spada z {fromSize} na {toSize}",
@@ -533,7 +533,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "grid.verifiedBadge": "Verified grid",
     "consistency.title": "Table consistency check",
     "consistency.checking": "Checking against test body profiles…",
-    "consistency.ok": "Consistent across {n} tested body profiles — size never drops as height/weight increase.",
+    "consistency.ok": "Consistent across {n} tested body profiles.",
     "consistency.issues": "{n} inconsistencies found — check these spots in the table:",
     "consistency.issue":
       "{axis} {from}→{to} ({gender}, {build}): size drops from {fromSize} to {toSize}",
