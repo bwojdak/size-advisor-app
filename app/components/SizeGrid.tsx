@@ -119,12 +119,22 @@ export function SizeGrid({
   const [unit, setUnit] = useState<"cm" | "in">("cm");
   const [addColOpen, setAddColOpen] = useState(false);
   // Domyślne kolumny z kategorii (raz, przy otwarciu edytora) — dalej
-  // sprzedawca dowolnie dodaje/usuwa z zamkniętej listy ALL_COLS.
+  // sprzedawca dowolnie dodaje/usuwa z zamkniętej listy ALL_COLS. Ważne:
+  // zawsze pokazujemy też kolumny, które mają realne dane w `rows` — Modal
+  // odmontowuje edytor przy zamknięciu, więc przy ponownym otwarciu ten
+  // useState liczy się od nowa; bez tego ręcznie dodany wymiar spoza
+  // domyślnego zestawu kategorii (np. biodra na koszulce) znikałby z widoku
+  // po zamknięciu i otwarciu edytora, mimo że zapisana wartość dalej tam
+  // jest — wyglądało to jak utrata danych.
   const [visibleDims, setVisibleDims] = useState<Array<keyof GridRow>>(() => {
     const allowed = category ? DIMS_BY_CATEGORY[category] : null;
-    return allowed
+    const base = allowed
       ? ALL_COLS.map((c) => c.key).filter((k) => allowed.includes(k))
       : ALL_COLS.map((c) => c.key);
+    const withData = ALL_COLS.map((c) => c.key).filter((k) =>
+      rows.some((r) => r[k].trim()),
+    );
+    return Array.from(new Set([...base, ...withData]));
   });
   const COLS = ALL_COLS.filter((c) => visibleDims.includes(c.key));
   const hiddenCols = ALL_COLS.filter((c) => !visibleDims.includes(c.key));
