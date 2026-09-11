@@ -1,10 +1,11 @@
 import { Fragment, useCallback, useState } from "react";
 import {
+  ActionList,
   BlockStack,
   Box,
   Button,
   InlineStack,
-  Select,
+  Popover,
   Text,
   TextField,
 } from "@shopify/polaris";
@@ -116,6 +117,7 @@ export function SizeGrid({
 }) {
   const { t } = useI18n();
   const [unit, setUnit] = useState<"cm" | "in">("cm");
+  const [addColOpen, setAddColOpen] = useState(false);
   // Domyślne kolumny z kategorii (raz, przy otwarciu edytora) — dalej
   // sprzedawca dowolnie dodaje/usuwa z zamkniętej listy ALL_COLS.
   const [visibleDims, setVisibleDims] = useState<Array<keyof GridRow>>(() => {
@@ -178,17 +180,44 @@ export function SizeGrid({
         <Text as="span" variant="bodyMd" fontWeight="medium">
           {t("grid.title")}
         </Text>
-        <InlineStack gap="0">
-          {(["cm", "in"] as const).map((u) => (
-            <Button
-              key={u}
-              size="micro"
-              pressed={unit === u}
-              onClick={() => setUnit(u)}
+        <InlineStack gap="200" blockAlign="center">
+          {hiddenCols.length ? (
+            <Popover
+              active={addColOpen}
+              onClose={() => setAddColOpen(false)}
+              activator={
+                <Button
+                  size="micro"
+                  disclosure={addColOpen ? "up" : "down"}
+                  onClick={() => setAddColOpen((v) => !v)}
+                >
+                  {t("grid.addMeasurement")}
+                </Button>
+              }
             >
-              {u}
-            </Button>
-          ))}
+              <ActionList
+                items={hiddenCols.map((c) => ({
+                  content: t(c.labelKey),
+                  onAction: () => {
+                    addCol(c.key);
+                    setAddColOpen(false);
+                  },
+                }))}
+              />
+            </Popover>
+          ) : null}
+          <InlineStack gap="0">
+            {(["cm", "in"] as const).map((u) => (
+              <Button
+                key={u}
+                size="micro"
+                pressed={unit === u}
+                onClick={() => setUnit(u)}
+              >
+                {u}
+              </Button>
+            ))}
+          </InlineStack>
         </InlineStack>
       </InlineStack>
       <Text as="p" variant="bodyXs" tone="subdued">
@@ -301,21 +330,6 @@ export function SizeGrid({
         <Button onClick={addRow} size="slim">
           {t("grid.addRow")}
         </Button>
-        {hiddenCols.length ? (
-          <div style={{ width: "200px" }}>
-            <Select
-              label={t("grid.addMeasurement")}
-              labelHidden
-              placeholder={t("grid.addMeasurement")}
-              value=""
-              onChange={addCol}
-              options={[
-                { label: t("grid.addMeasurement"), value: "" },
-                ...hiddenCols.map((c) => ({ label: t(c.labelKey), value: c.key })),
-              ]}
-            />
-          </div>
-        ) : null}
       </InlineStack>
     </BlockStack>
   );
