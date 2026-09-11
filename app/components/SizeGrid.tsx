@@ -299,20 +299,41 @@ export function SizeGrid({
                   placeholder="M"
                   size="slim"
                 />
-                {COLS.map((c) => (
-                  <TextField
-                    key={c.key}
-                    label={t(c.labelKey)}
-                    labelHidden
-                    type="text"
-                    inputMode="decimal"
-                    value={cmToDisplay(row[c.key], unit)}
-                    onChange={(v) => setCell(i, c.key, displayToCm(v, unit))}
-                    autoComplete="off"
-                    placeholder={cmToDisplay(c.ph, unit)}
-                    size="slim"
-                  />
-                ))}
+                {COLS.map((c) => {
+                  // Placeholder (przykładowa liczba) sam w sobie wygląda zbyt
+                  // podobnie do realnie wpisanej wartości, zwłaszcza gdy jest
+                  // taki sam w każdym wierszu — puste, ale "brakujące" komórki
+                  // (patrz incompleteCols) dostają dodatkowo lekkie tło, żeby
+                  // od razu było widać, że to podpowiedź, nie dane.
+                  const isEmptyFlagged =
+                    !row[c.key].trim() && incompleteCols.includes(c);
+                  return (
+                    <div
+                      key={c.key}
+                      style={
+                        isEmptyFlagged
+                          ? {
+                              background:
+                                "var(--p-color-bg-caution-subdued, #fff4e4)",
+                              borderRadius: "6px",
+                            }
+                          : undefined
+                      }
+                    >
+                      <TextField
+                        label={t(c.labelKey)}
+                        labelHidden
+                        type="text"
+                        inputMode="decimal"
+                        value={cmToDisplay(row[c.key], unit)}
+                        onChange={(v) => setCell(i, c.key, displayToCm(v, unit))}
+                        autoComplete="off"
+                        placeholder={cmToDisplay(c.ph, unit)}
+                        size="slim"
+                      />
+                    </div>
+                  );
+                })}
                 <Button
                   variant="plain"
                   tone="critical"
