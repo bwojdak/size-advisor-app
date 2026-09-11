@@ -9,6 +9,7 @@ import {
   extractProductChart,
   getAIConfig,
   EXTRACTION_VERSION,
+  parseStructuredRows,
 } from "../lib/size-advisor.server";
 
 const MAX_IMAGE_CHARS = 3_600_000;
@@ -106,6 +107,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     productTitle?: string;
     customNotes?: string;
     parsedSizeData?: string;
+    structuredSizeData?: string | null;
     sizeChartImage?: string | null;
   };
 
@@ -173,10 +175,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return Response.json({ error: t("error.imageTooLarge") }, { status: 400 });
   }
 
+  const structuredRows = parseStructuredRows(form.structuredSizeData ?? null);
   const payload = {
     productTitle: String(form.productTitle || "").slice(0, 255),
     customNotes: String(form.customNotes || "").slice(0, 1500),
     parsedSizeData: String(form.parsedSizeData || "").slice(0, 3000),
+    structuredSizeData: structuredRows ? JSON.stringify(structuredRows) : null,
     sizeChartImage,
   };
 

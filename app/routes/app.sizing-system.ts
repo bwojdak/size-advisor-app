@@ -7,6 +7,7 @@ import {
   extractProductChart,
   getAIConfig,
   EXTRACTION_VERSION,
+  parseStructuredRows,
 } from "../lib/size-advisor.server";
 
 type SystemRow = {
@@ -74,6 +75,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     name?: string;
     customNotes?: string;
     parsedSizeData?: string;
+    structuredSizeData?: string | null;
   };
 
   const extractOpts = {
@@ -109,10 +111,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!name) {
     return Response.json({ error: t("sizingSystems.error.name") }, { status: 400 });
   }
+  // Siatka wymiarów przychodzi już jako JSON z panelu (SizeGrid.gridToPayload);
+  // re-parsujemy przez parseStructuredRows, żeby nie zaufać ślepo klientowi.
+  const structuredRows = parseStructuredRows(form.structuredSizeData ?? null);
   const payload = {
     name,
     customNotes: String(form.customNotes || "").slice(0, 1500),
     parsedSizeData: String(form.parsedSizeData || "").slice(0, 3000),
+    structuredSizeData: structuredRows ? JSON.stringify(structuredRows) : null,
   };
 
   // Kolizja nazwy z innym systemem tego sklepu.

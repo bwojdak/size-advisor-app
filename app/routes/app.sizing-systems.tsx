@@ -20,9 +20,12 @@ import { loadShopSettings } from "../lib/shop-settings.server";
 import { useI18n, type Locale } from "../lib/i18n";
 import {
   parseStoredExtraction,
+  parseStructuredRows,
   describeExtraction,
   EXTRACTION_VERSION,
+  type NormalizedSizeRow,
 } from "../lib/size-advisor.server";
+import { SizeGrid, rowsToGrid, gridToPayload, type GridRow } from "../components/SizeGrid";
 
 type Summary = ReturnType<typeof describeExtraction>;
 type AttachedProduct = { id: string; title: string };
@@ -33,6 +36,10 @@ type SystemView = {
   customNotes: string;
   mapped: number;
   products: AttachedProduct[];
+  /** Zweryfikowana siatka (jeśli sprzedawca ją zapisał) — do seedowania edytora. */
+  structuredRows: NormalizedSizeRow[];
+  /** Sugestia z ostatniej analizy AI — do przycisku "wypełnij z analizy". */
+  suggestedRows: NormalizedSizeRow[];
   extraction:
     | { state: "ok"; summary: Summary }
     | { state: "error" }
@@ -81,6 +88,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       customNotes: s.customNotes ?? "",
       mapped: attached.length,
       products: attached,
+      structuredRows: parseStructuredRows(s.structuredSizeData) ?? [],
+      suggestedRows: extraction.state === "ok" ? extraction.summary.rows : [],
       extraction,
     };
   });
@@ -134,6 +143,9 @@ function ExtractionSummary({ view }: { view: SystemView }) {
   return (
     <BlockStack gap="150">
       <InlineStack gap="150" wrap>
+        {view.structuredRows.length > 0 ? (
+          <Badge tone="success">{t("grid.verifiedBadge")}</Badge>
+        ) : null}
         <Badge tone="info">{t(`products.extraction.cat.${s.category}`)}</Badge>
         <Badge tone="info">{t(`products.extraction.cut.${s.cut}`)}</Badge>
         <Badge tone={s.hasMeasurements ? "success" : undefined}>
@@ -185,7 +197,14 @@ function ExtractionSummary({ view }: { view: SystemView }) {
 }
 
 type Editing =
-  | { id: string | null; name: string; parsedSizeData: string; customNotes: string }
+  | {
+      id: string | null;
+      name: string;
+      parsedSizeData: string;
+      customNotes: string;
+      gridRows: GridRow[];
+      suggestedRows: GridRow[];
+    }
   | null;
 
 export default function SizingSystemsPage() {
@@ -199,14 +218,27 @@ export default function SizingSystemsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const openNew = () =>
-    setEditing({ id: null, name: "", parsedSizeData: "", customNotes: "" });
-  const openEdit = (s: SystemView) =>
+    setEditing({
+      id: null,
+      name: "",
+      parsedSizeData: "",
+      customNotes: "",
+      gridRows: [],
+      suggestedRows: [],
+    });
+  const openEdit = (s: SystemView) => {
+    const suggestedRows = rowsToGrid(s.suggestedRows);
     setEditing({
       id: s.id,
       name: s.name,
       parsedSizeData: s.parsedSizeData,
       customNotes: s.customNotes,
+      gridRows: s.structuredRows.length
+        ? rowsToGrid(s.structuredRows)
+        : suggestedRows,
+      suggestedRows,
     });
+  };
 
   const save = async () => {
     if (!editing) return;
@@ -220,6 +252,7 @@ export default function SizingSystemsPage() {
           name: editing.name,
           parsedSizeData: editing.parsedSizeData,
           customNotes: editing.customNotes,
+          structuredSizeData: gridToPayload(editing.gridRows),
         },
         locale,
       );
@@ -474,6 +507,29 @@ export default function SizingSystemsPage() {
               placeholder={t("sizingSystems.chartPlaceholder")}
               helpText={t("sizingSystems.chartHelp")}
             />
+            <BlockStack gap="150">
+              <SizeGrid
+                rows={editing?.gridRows ?? []}
+                onChange={(rows) =>
+                  setEditing((e) => (e ? { ...e, gridRows: rows } : e))
+                }
+              />
+              {editing?.suggestedRows.length ? (
+                <InlineStack>
+                  <Button
+                    size="slim"
+                    variant="plain"
+                    onClick={() =>
+                      setEditing((e) =>
+                        e ? { ...e, gridRows: e.suggestedRows } : e,
+                      )
+                    }
+                  >
+                    {t("grid.prefillFromAi")}
+                  </Button>
+                </InlineStack>
+              ) : null}
+            </BlockStack>
             <TextField
               label={t("sizingSystems.notesLabel")}
               value={editing?.customNotes ?? ""}

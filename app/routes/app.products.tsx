@@ -27,9 +27,12 @@ import { useI18n, type Locale } from "../lib/i18n";
 import { LockedFeature } from "../components/LockedFeature";
 import {
   parseStoredExtraction,
+  parseStructuredRows,
   describeExtraction,
   EXTRACTION_VERSION,
+  type NormalizedSizeRow,
 } from "../lib/size-advisor.server";
+import { SizeGrid, rowsToGrid, gridToPayload, type GridRow } from "../components/SizeGrid";
 
 type ExtractionInfo =
   | { state: "ok"; at: string | null; summary: ReturnType<typeof describeExtraction> }
@@ -115,10 +118,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       : { state: "pending" };
   }
 
+  // Zweryfikowana siatka wymiarów per produkt (jeśli sprzedawca ją zapisał) —
+  // do seedowania edytowalnego gridu, patrz SizeGrid.
+  const structuredByProduct: Record<string, NormalizedSizeRow[]> = {};
+  for (const r of rules) {
+    const rows = parseStructuredRows(r.structuredSizeData);
+    if (rows) structuredByProduct[r.productId] = rows;
+  }
+
   return {
     rules,
     products,
     extractions,
+    structuredByProduct,
     sizingSystems,
     plan: settings.plan,
     productLimit: caps.productRuleLimit,
@@ -154,6 +166,7 @@ export default function ProductsConfig() {
     rules,
     products,
     extractions,
+    structuredByProduct,
     sizingSystems,
     plan,
     productLimit,
@@ -252,6 +265,8 @@ export default function ProductsConfig() {
   const [editing, setEditing] = useState<Editing>(null);
   const [notes, setNotes] = useState("");
   const [sizeText, setSizeText] = useState("");
+  const [gridRows, setGridRows] = useState<GridRow[]>([]);
+  const [suggestedRows, setSuggestedRows] = useState<GridRow[]>([]);
   const [image, setImage] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"save" | "delete" | null>(null);
@@ -292,8 +307,16 @@ export default function ProductsConfig() {
       setImage(existing?.sizeChartImage || null);
       setImageError(null);
       setActionError(null);
+      const extractionRows =
+        extractions[productId]?.state === "ok"
+          ? extractions[productId].summary.rows
+          : [];
+      const suggested = rowsToGrid(extractionRows);
+      setSuggestedRows(suggested);
+      const structured = structuredByProduct[productId];
+      setGridRows(structured ? rowsToGrid(structured) : suggested);
     },
-    [rulesById],
+    [rulesById, extractions, structuredByProduct],
   );
 
   const openPicker = useCallback(async () => {
@@ -350,6 +373,7 @@ export default function ProductsConfig() {
           productTitle: editing.title,
           customNotes: notes,
           parsedSizeData: sizeText,
+          structuredSizeData: gridToPayload(gridRows),
           sizeChartImage: image,
         },
         locale,
@@ -364,7 +388,7 @@ export default function ProductsConfig() {
     } finally {
       setBusy(null);
     }
-  }, [editing, notes, sizeText, image, revalidator, locale, t]);
+  }, [editing, notes, sizeText, gridRows, image, revalidator, locale, t]);
 
   const removeRule = useCallback(async () => {
     if (!editing) return;
@@ -454,7 +478,8 @@ export default function ProductsConfig() {
   );
 
   const isNewRule = editing !== null && !rulesById.has(editing.productId);
-  const ruleEmpty = !notes.trim() && !sizeText.trim() && !image;
+  const ruleEmpty =
+    !notes.trim() && !sizeText.trim() && !image && gridRows.length === 0;
   const editingExtraction =
     editing && rulesById.has(editing.productId)
       ? extractions[editing.productId]
@@ -570,6 +595,11 @@ export default function ProductsConfig() {
                             </Badge>
                           ) : (
                             <>
+                              {rule.structuredSizeData ? (
+                                <Badge tone="success">
+                                  {t("grid.verifiedBadge")}
+                                </Badge>
+                              ) : null}
                               {rule.customNotes ? (
                                 <Badge tone="info">
                                   {t("products.badge.notes")}
@@ -587,7 +617,8 @@ export default function ProductsConfig() {
                               ) : null}
                               {!rule.customNotes &&
                               !rule.parsedSizeData &&
-                              !rule.sizeChartImage ? (
+                              !rule.sizeChartImage &&
+                              !rule.structuredSizeData ? (
                                 <Badge>{t("products.badge.empty")}</Badge>
                               ) : null}
                             </>
@@ -893,6 +924,21 @@ export default function ProductsConfig() {
               helpText={t("products.field.sizeText.help")}
               placeholder={t("products.field.sizeText.placeholder")}
             />
+
+            <BlockStack gap="150">
+              <SizeGrid rows={gridRows} onChange={setGridRows} />
+              {suggestedRows.length ? (
+                <InlineStack>
+                  <Button
+                    size="slim"
+                    variant="plain"
+                    onClick={() => setGridRows(suggestedRows)}
+                  >
+                    {t("grid.prefillFromAi")}
+                  </Button>
+                </InlineStack>
+              ) : null}
+            </BlockStack>
 
             <BlockStack gap="200">
               <Text as="span" variant="bodyMd" fontWeight="medium">

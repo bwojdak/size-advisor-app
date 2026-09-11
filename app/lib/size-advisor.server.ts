@@ -1691,6 +1691,9 @@ export function describeExtraction(e: ChartExtraction): {
   cut: CutLooseness;
   rowCount: number;
   sizes: string[];
+  /** Surowe wiersze z ostatniej analizy AI — sugestia startowa dla edytowalnej
+   *  siatki wymiarów w panelu (patrz `structuredSizeData` / `SizeGrid`). */
+  rows: NormalizedSizeRow[];
   stretch: boolean;
   elasticWaist: boolean;
   outerwear: boolean;
@@ -1729,6 +1732,7 @@ export function describeExtraction(e: ChartExtraction): {
     cut: e.cut,
     rowCount: rows.length,
     sizes: rows.map((r) => r.size),
+    rows,
     stretch: e.stretch,
     elasticWaist: e.elasticWaist,
     outerwear: e.outerwear,
