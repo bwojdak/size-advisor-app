@@ -231,10 +231,6 @@ type Editing =
       gridRows: GridRow[];
       suggestedRows: GridRow[];
       category: GarmentCategory | null;
-      /** true tylko zaraz po tym, jak tabelę wypełniła automatycznie analiza
-       *  ZDJĘCIA (patrz save()/reanalyze()) — pokazuje ostrzeżenie "sprawdź to"
-       *  dopóki admin czegoś nie zmieni w siatce albo nie zapisze ponownie. */
-      unverifiedFromImage: boolean;
     }
   | null;
 
@@ -260,13 +256,14 @@ export default function SizingSystemsPage() {
       gridRows: [],
       suggestedRows: [],
       category: null,
-      unverifiedFromImage: false,
     });
   };
   // Prosta, przewidywalna zasada: tabela pokazuje dokładnie to, co jest
-  // zapisane — albo nic. Sugestię z ostatniej analizy AI dostaje się
-  // WYŁĄCZNIE explicit kliknięciem „Wypełnij z ostatniej analizy AI" niżej
-  // (albo automatycznie zaraz po analizie ZDJĘCIA — patrz save()/reanalyze()).
+  // zapisane — albo nic. Sugestię z ostatniej analizy AI (ze zdjęcia albo z
+  // notatek) dostaje się WYŁĄCZNIE explicit kliknięciem „Wypełnij z ostatniej
+  // analizy AI" niżej — nigdy automatycznie. Systemy są współdzielone przez
+  // wiele produktów naraz, więc błąd AI w odczycie ma tu większy zasięg niż
+  // przy pojedynczym produkcie — jedno świadome kliknięcie to tania polisa.
   const openEdit = (s: SystemView) => {
     const suggestedRows = rowsToGrid(s.suggestedRows);
     setImageError(null);
@@ -279,7 +276,6 @@ export default function SizingSystemsPage() {
       gridRows: s.structuredRows.length ? rowsToGrid(s.structuredRows) : [],
       suggestedRows,
       category: s.extraction.state === "ok" ? s.extraction.summary.category : null,
-      unverifiedFromImage: false,
     });
   };
 
@@ -300,24 +296,6 @@ export default function SizingSystemsPage() {
     },
     [t],
   );
-
-  // Gdy analiza ZDJĘCIA znajdzie wymiary, a admin jeszcze nic nie wpisał do
-  // tabeli ręcznie (gridRows puste) — podstawiamy je od razu, żeby nie trzeba
-  // było osobno klikać "Wypełnij z ostatniej analizy AI". To wciąż tylko
-  // szkic w formularzu, nie zapis do bazy — i dostaje wyraźne ostrzeżenie
-  // (unverifiedFromImage), które znika dopiero gdy admin coś zmieni w siatce
-  // albo zapisze ponownie, świadomie to akceptując.
-  const applyImageAutoFill = (result: {
-    summary?: Summary | null;
-    fromImage?: boolean;
-  }) => {
-    if (!result.fromImage || !result.summary?.rows.length) return;
-    const rows = rowsToGrid(result.summary.rows);
-    setEditing((e) => {
-      if (!e || e.gridRows.length > 0) return e;
-      return { ...e, gridRows: rows, suggestedRows: rows, unverifiedFromImage: true };
-    });
-  };
 
   const save = async () => {
     if (!editing) return;
@@ -346,7 +324,6 @@ export default function SizingSystemsPage() {
       if (!editing.id && res?.id) {
         setEditing((e) => (e ? { ...e, id: res.id } : e));
       }
-      applyImageAutoFill(res);
       revalidator.revalidate();
     } catch (err) {
       setError(
@@ -373,7 +350,6 @@ export default function SizingSystemsPage() {
           : t("products.extraction.reanalyzeFailed"),
         !r?.analyzed,
       );
-      if (editing?.id === id) applyImageAutoFill(r);
       revalidator.revalidate();
     } catch {
       toast(t("products.extraction.reanalyzeFailed"), true);
@@ -585,19 +561,10 @@ export default function SizingSystemsPage() {
               placeholder={t("sizingSystems.namePlaceholder")}
             />
             <BlockStack gap="150">
-              {editing?.unverifiedFromImage ? (
-                <Box padding="200" background="bg-surface-caution" borderRadius="100">
-                  <Text as="span" variant="bodySm" tone="caution">
-                    {t("grid.unverifiedFromImage")}
-                  </Text>
-                </Box>
-              ) : null}
               <SizeGrid
                 rows={editing?.gridRows ?? []}
                 onChange={(rows) =>
-                  setEditing((e) =>
-                    e ? { ...e, gridRows: rows, unverifiedFromImage: false } : e,
-                  )
+                  setEditing((e) => (e ? { ...e, gridRows: rows } : e))
                 }
                 category={editing?.category ?? null}
               />

@@ -83,8 +83,6 @@ const messages: Record<Locale, Record<string, string>> = {
     "grid.incompleteCols": "Brakuje wartości: {details}.",
     "grid.prefillFromAi": "Wypełnij z ostatniej analizy AI",
     "grid.verifiedBadge": "Zweryfikowana siatka",
-    "grid.unverifiedFromImage":
-      "Tabela wypełniona automatycznie z analizy zdjęcia — sprawdź liczby przed zapisem, AI mogło się pomylić.",
     "sizingSystems.notesLabel": "Notatki dla AI (opcjonalnie)",
     "sizingSystems.notesHelp":
       "Krój, materiał, korekty rozmiaru (np. „rozmiarówka zaniżona — brać większy”) — liczby i tak biorą się z siatki wyżej, to pole pomaga tylko sklasyfikować produkt.",
@@ -515,8 +513,6 @@ const messages: Record<Locale, Record<string, string>> = {
     "grid.incompleteCols": "Missing values: {details}.",
     "grid.prefillFromAi": "Fill from the latest AI analysis",
     "grid.verifiedBadge": "Verified grid",
-    "grid.unverifiedFromImage":
-      "Table auto-filled from the photo analysis — check the numbers before saving, the AI may have gotten something wrong.",
     "sizingSystems.notesLabel": "Notes for the AI (optional)",
     "sizingSystems.notesHelp":
       "Cut, material, size adjustments (e.g. “runs small — size up”) — the numbers still come from the grid above, this field only helps classify the product.",

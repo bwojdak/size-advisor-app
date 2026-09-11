@@ -10,7 +10,6 @@ import {
   EXTRACTION_VERSION,
   parseStructuredRows,
   structuredRowsAsPromptText,
-  describeExtraction,
 } from "../lib/size-advisor.server";
 
 const MAX_IMAGE_CHARS = 3_600_000;
@@ -25,23 +24,25 @@ type SystemRow = {
   sizeChartImage: string | null;
 };
 
-type ExtractionSummary = ReturnType<typeof describeExtraction>;
-
 // Analiza AI systemu rozmiarów. Bez opisu produktu (system nie jest przypięty
 // do jednego produktu) — czytamy z notatek, zweryfikowanej siatki (jako
 // kontekst liczbowy dla oceny kroju) i opcjonalnego zdjęcia rozmiarówki.
+// Wynik trafia WYŁĄCZNIE do "Co zrozumiała AI" / przycisku "Wypełnij z
+// ostatniej analizy AI" — nigdy nie wpisuje się do tabeli automatycznie
+// (systemy są współdzielone przez wiele produktów, więc błąd AI w odczycie
+// ma tu większy zasięg niż przy jednym produkcie).
 async function runSystemExtraction(
   system: SystemRow,
   opts: { brandStyleNotes: string | null; language: string | null; sizeChartImageAI: boolean },
-): Promise<{ analyzed: boolean; summary: ExtractionSummary | null; fromImage: boolean }> {
+): Promise<boolean> {
   const { provider, model } = getAIConfig();
   const apiKey =
     provider === "gemini" ? process.env.GEMINI_API_KEY : process.env.OPENAI_API_KEY;
   const useImage = opts.sizeChartImageAI && Boolean(system.sizeChartImage);
-  if (!apiKey) return { analyzed: false, summary: null, fromImage: false };
+  if (!apiKey) return false;
 
   try {
-    const { extraction, rawJson } = await extractProductChart(model, {
+    const { rawJson } = await extractProductChart(model, {
       productTitle: system.name || null,
       productDescription: null,
       brandStyleNotes: opts.brandStyleNotes,
@@ -69,7 +70,7 @@ async function runSystemExtraction(
         extractionError: null,
       },
     });
-    return { analyzed: true, summary: describeExtraction(extraction), fromImage: useImage };
+    return true;
   } catch (e) {
     console.error("[sizing-system] analiza nie powiodła się", e);
     await db.sizingSystem.update({
@@ -80,7 +81,7 @@ async function runSystemExtraction(
         extractionVersion: null,
       },
     });
-    return { analyzed: false, summary: null, fromImage: false };
+    return false;
   }
 }
 
@@ -126,8 +127,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (!existing) {
       return Response.json({ error: t("error.status", { status: 404 }) }, { status: 404 });
     }
-    const result = await runSystemExtraction(existing, extractOpts);
-    return Response.json({ success: true, ...result });
+    const analyzed = await runSystemExtraction(existing, extractOpts);
+    return Response.json({ success: true, analyzed });
   }
 
   const name = String(form.name || "").trim().slice(0, 80);
@@ -179,6 +180,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         data: { shopId: settings.id, ...payload },
       });
 
-  const result = await runSystemExtraction(system, extractOpts);
-  return Response.json({ success: true, id: system.id, ...result });
+  const analyzed = await runSystemExtraction(system, extractOpts);
+  return Response.json({ success: true, id: system.id, analyzed });
 };
