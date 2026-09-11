@@ -16,11 +16,24 @@ const NO_CACHE = { headers: { "Cache-Control": "no-store, max-age=0" } };
 
 const GARMENT_DIM_KEYS = ["chest", "waist", "hip", "length", "inseam"] as const;
 
+// Które wymiary mają sens dla kategorii produktu — musi zostać w sync z
+// `DIMS_BY_CATEGORY` w app/components/SizeGrid.tsx (tam samo dla panelu).
+// Koszulka (top) nie pyta o pas/biodra/nogawkę, nawet jeśli w zapisanej
+// tabeli zalągł się stary, uśpiony wpis z błędnej analizy AI.
+const DIMS_BY_CATEGORY: Record<string, readonly string[]> = {
+  top: ["chest", "length"],
+  bottom: ["waist", "hip", "inseam", "length"],
+  dress: ["chest", "waist", "length"],
+};
+
 /** Które wymiary ma tabela produktu — do pól ubrania referencyjnego w widżecie
- *  (pytamy TYLKO o to, co tabela faktycznie zawiera). Wymaga ≥2 wierszy z
- *  wartością i realnego rozrzutu (≥1 cm) — jak `spread()` w silniku. */
-function garmentDimsOf(rows: NormalizedSizeRow[]): string[] {
+ *  (pytamy TYLKO o to, co tabela faktycznie zawiera I co pasuje do kategorii).
+ *  Wymaga ≥2 wierszy z wartością i realnego rozrzutu (≥1 cm) — jak `spread()`
+ *  w silniku. */
+function garmentDimsOf(rows: NormalizedSizeRow[], category: string): string[] {
+  const allowed = DIMS_BY_CATEGORY[category] ?? GARMENT_DIM_KEYS;
   return GARMENT_DIM_KEYS.filter((key) => {
+    if (!allowed.includes(key)) return false;
     const vals = rows
       .map((r) => r[key])
       .filter((v): v is number => typeof v === "number" && v > 0);
@@ -86,7 +99,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             ? parseStoredExtraction(chartJson)
             : null;
         const extraction = applyStructuredRows(base ?? emptyExtraction(), chartStructured);
-        garmentDims = garmentDimsOf(extraction.rows);
+        garmentDims = garmentDimsOf(extraction.rows, extraction.category);
       }
     }
 

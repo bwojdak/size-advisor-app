@@ -901,6 +901,29 @@ export default function ProductsConfig() {
               </Text>
             ) : (
             <>
+            <BlockStack gap="150">
+              <SizeGrid
+                rows={gridRows}
+                onChange={setGridRows}
+                category={
+                  editingExtraction?.state === "ok"
+                    ? editingExtraction.summary.category
+                    : null
+                }
+              />
+              {suggestedRows.length ? (
+                <InlineStack>
+                  <Button
+                    size="slim"
+                    variant="plain"
+                    onClick={() => setGridRows(suggestedRows)}
+                  >
+                    {t("grid.prefillFromAi")}
+                  </Button>
+                </InlineStack>
+              ) : null}
+            </BlockStack>
+
             <TextField
               label={t("products.field.notes.label")}
               value={notes}
@@ -917,28 +940,13 @@ export default function ProductsConfig() {
               label={t("products.field.sizeText.label")}
               value={sizeText}
               onChange={setSizeText}
-              multiline={6}
+              multiline={4}
               autoComplete="off"
               maxLength={3000}
               showCharacterCount
               helpText={t("products.field.sizeText.help")}
               placeholder={t("products.field.sizeText.placeholder")}
             />
-
-            <BlockStack gap="150">
-              <SizeGrid rows={gridRows} onChange={setGridRows} />
-              {suggestedRows.length ? (
-                <InlineStack>
-                  <Button
-                    size="slim"
-                    variant="plain"
-                    onClick={() => setGridRows(suggestedRows)}
-                  >
-                    {t("grid.prefillFromAi")}
-                  </Button>
-                </InlineStack>
-              ) : null}
-            </BlockStack>
 
             <BlockStack gap="200">
               <Text as="span" variant="bodyMd" fontWeight="medium">

@@ -59,11 +59,11 @@ const messages: Record<Locale, Record<string, string>> = {
       "Usunąć system „{name}”? Odepnie się od {n} produktów (wrócą do własnej konfiguracji).",
     "sizingSystems.nameLabel": "Nazwa systemu",
     "sizingSystems.namePlaceholder": "np. Standardowe t-shirty",
-    "sizingSystems.chartLabel": "Tabela wymiarów (tekst)",
+    "sizingSystems.chartLabel": "Opis dla AI (opcjonalnie)",
     "sizingSystems.chartPlaceholder":
       "Rozmiar S: klatka 114, długość 68\nRozmiar M: klatka 120, długość 70\n...",
     "sizingSystems.chartHelp":
-      "Wklej wymiary w cm dla każdego rozmiaru. AI odczyta je raz przy zapisie i użyje dla wszystkich przypiętych produktów.",
+      "Liczby bierzemy z siatki powyżej — to pole służy tylko do rozpoznania kroju, materiału i kategorii przez AI. Możesz wkleić oryginalną tabelę sprzedawcy jako podpowiedź albo zostawić puste.",
     "grid.title": "Zweryfikowana siatka wymiarów (cm)",
     "grid.help":
       "Wpisz dokładne centymetry per rozmiar — to nadpisuje odczyt AI i eliminuje pomyłki w tabeli (np. pomylony obwód z połową obwodu). Zostaw puste, jeśli wymiar nie dotyczy tego produktu.",
@@ -274,9 +274,9 @@ const messages: Record<Locale, Record<string, string>> = {
     "products.field.notes.help": "Trafia do promptu przy każdej rekomendacji tego produktu.",
     "products.field.notes.placeholder":
       "np. Ten model ma wąski krój w ramionach — przy budowie atletycznej proponuj rozmiar większy.",
-    "products.field.sizeText.label": "Tabela wymiarów (tekst)",
+    "products.field.sizeText.label": "Opis dla AI (opcjonalnie)",
     "products.field.sizeText.help":
-      "Wklej wymiary z metki lub karty produktu. AI użyje ich zamiast szacować z opisu.",
+      "Liczby bierzemy z siatki powyżej — to pole służy tylko do rozpoznania kroju, materiału i kategorii przez AI. Możesz wkleić oryginalną tabelę z metki jako podpowiedź albo zostawić puste.",
     "products.field.sizeText.placeholder":
       "S — obwód klatki 96–101 cm, długość 68 cm\nM — obwód klatki 102–107 cm, długość 70 cm\nL — obwód klatki 108–113 cm, długość 72 cm",
     "products.field.image.label": "Zdjęcie rozmiarówki",
@@ -480,11 +480,11 @@ const messages: Record<Locale, Record<string, string>> = {
       "Delete the \"{name}\" system? It will detach from {n} products (they go back to their own config).",
     "sizingSystems.nameLabel": "System name",
     "sizingSystems.namePlaceholder": "e.g. Standard t-shirts",
-    "sizingSystems.chartLabel": "Size chart (text)",
+    "sizingSystems.chartLabel": "Description for the AI (optional)",
     "sizingSystems.chartPlaceholder":
       "Size S: chest 114, length 68\nSize M: chest 120, length 70\n...",
     "sizingSystems.chartHelp":
-      "Paste per-size measurements in cm. The AI reads them once on save and uses them for every attached product.",
+      "Numbers come from the grid above — this field is only used to help the AI recognise the cut, material and category. Paste the original chart as a hint, or leave it blank.",
     "grid.title": "Verified measurement grid (cm)",
     "grid.help":
       "Type exact centimetres per size — this overrides the AI's reading of the chart and removes parsing mistakes (e.g. a full measurement mistaken for a half one). Leave a field blank where it doesn't apply to this product.",
@@ -694,9 +694,9 @@ const messages: Record<Locale, Record<string, string>> = {
     "products.field.notes.help": "Added to the prompt on every recommendation for this product.",
     "products.field.notes.placeholder":
       "e.g. This model runs narrow in the shoulders — for athletic builds suggest one size up.",
-    "products.field.sizeText.label": "Size chart (text)",
+    "products.field.sizeText.label": "Description for the AI (optional)",
     "products.field.sizeText.help":
-      "Paste measurements from the label or product page. The AI uses them instead of estimating from the description.",
+      "Numbers come from the grid above — this field is only used to help the AI recognise the cut, material and category. Paste the original chart from the label as a hint, or leave it blank.",
     "products.field.sizeText.placeholder":
       "S — chest 96–101 cm, length 68 cm\nM — chest 102–107 cm, length 70 cm\nL — chest 108–113 cm, length 72 cm",
     "products.field.image.label": "Size chart image",

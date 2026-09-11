@@ -55,7 +55,7 @@ export function gridToPayload(rows: GridRow[]): string | null {
   return clean.length >= 2 ? JSON.stringify(clean) : null;
 }
 
-const COLS: Array<{ key: keyof GridRow; labelKey: string; ph: string }> = [
+const ALL_COLS: Array<{ key: keyof GridRow; labelKey: string; ph: string }> = [
   { key: "chest", labelKey: "grid.col.chest", ph: "110" },
   { key: "waist", labelKey: "grid.col.waist", ph: "96" },
   { key: "hip", labelKey: "grid.col.hip", ph: "112" },
@@ -63,14 +63,31 @@ const COLS: Array<{ key: keyof GridRow; labelKey: string; ph: string }> = [
   { key: "inseam", labelKey: "grid.col.inseam", ph: "80" },
 ];
 
+export type GarmentCategory = "top" | "bottom" | "dress";
+
+// Które kolumny mają sens dla danej kategorii — koszulka nie potrzebuje pasa/
+// bioder/nogawki. Nieznana kategoria (nowy produkt, przed pierwszą analizą) =
+// pokaż wszystko, żeby niczego przedwcześnie nie ukryć.
+const DIMS_BY_CATEGORY: Record<GarmentCategory, Array<keyof GridRow>> = {
+  top: ["chest", "length"],
+  bottom: ["waist", "hip", "inseam", "length"],
+  dress: ["chest", "waist", "length"],
+};
+
 export function SizeGrid({
   rows,
   onChange,
+  category,
 }: {
   rows: GridRow[];
   onChange: (rows: GridRow[]) => void;
+  /** Kategoria z ostatniej analizy AI — zawęża widoczne kolumny. null/undefined
+   *  (jeszcze nieznana) pokazuje wszystkie 5, żeby nic nie zniknęło przedwcześnie. */
+  category?: GarmentCategory | null;
 }) {
   const { t } = useI18n();
+  const allowed = category ? DIMS_BY_CATEGORY[category] : null;
+  const COLS = allowed ? ALL_COLS.filter((c) => allowed.includes(c.key)) : ALL_COLS;
 
   const setCell = useCallback(
     (i: number, key: keyof GridRow, value: string) => {
@@ -102,10 +119,10 @@ export function SizeGrid({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "72px repeat(5, 74px) 28px",
+              gridTemplateColumns: `72px repeat(${COLS.length}, 74px) 28px`,
               gap: "6px",
               alignItems: "end",
-              minWidth: "560px",
+              minWidth: `${100 + COLS.length * 80}px`,
             }}
           >
             <span />

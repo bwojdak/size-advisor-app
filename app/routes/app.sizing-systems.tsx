@@ -25,7 +25,13 @@ import {
   EXTRACTION_VERSION,
   type NormalizedSizeRow,
 } from "../lib/size-advisor.server";
-import { SizeGrid, rowsToGrid, gridToPayload, type GridRow } from "../components/SizeGrid";
+import {
+  SizeGrid,
+  rowsToGrid,
+  gridToPayload,
+  type GridRow,
+  type GarmentCategory,
+} from "../components/SizeGrid";
 
 type Summary = ReturnType<typeof describeExtraction>;
 type AttachedProduct = { id: string; title: string };
@@ -204,6 +210,7 @@ type Editing =
       customNotes: string;
       gridRows: GridRow[];
       suggestedRows: GridRow[];
+      category: GarmentCategory | null;
     }
   | null;
 
@@ -225,6 +232,7 @@ export default function SizingSystemsPage() {
       customNotes: "",
       gridRows: [],
       suggestedRows: [],
+      category: null,
     });
   const openEdit = (s: SystemView) => {
     const suggestedRows = rowsToGrid(s.suggestedRows);
@@ -237,6 +245,7 @@ export default function SizingSystemsPage() {
         ? rowsToGrid(s.structuredRows)
         : suggestedRows,
       suggestedRows,
+      category: s.extraction.state === "ok" ? s.extraction.summary.category : null,
     });
   };
 
@@ -494,25 +503,13 @@ export default function SizingSystemsPage() {
               maxLength={80}
               placeholder={t("sizingSystems.namePlaceholder")}
             />
-            <TextField
-              label={t("sizingSystems.chartLabel")}
-              value={editing?.parsedSizeData ?? ""}
-              onChange={(v) =>
-                setEditing((e) => (e ? { ...e, parsedSizeData: v } : e))
-              }
-              multiline={6}
-              autoComplete="off"
-              maxLength={3000}
-              monospaced
-              placeholder={t("sizingSystems.chartPlaceholder")}
-              helpText={t("sizingSystems.chartHelp")}
-            />
             <BlockStack gap="150">
               <SizeGrid
                 rows={editing?.gridRows ?? []}
                 onChange={(rows) =>
                   setEditing((e) => (e ? { ...e, gridRows: rows } : e))
                 }
+                category={editing?.category ?? null}
               />
               {editing?.suggestedRows.length ? (
                 <InlineStack>
@@ -530,6 +527,19 @@ export default function SizingSystemsPage() {
                 </InlineStack>
               ) : null}
             </BlockStack>
+            <TextField
+              label={t("sizingSystems.chartLabel")}
+              value={editing?.parsedSizeData ?? ""}
+              onChange={(v) =>
+                setEditing((e) => (e ? { ...e, parsedSizeData: v } : e))
+              }
+              multiline={4}
+              autoComplete="off"
+              maxLength={3000}
+              monospaced
+              placeholder={t("sizingSystems.chartPlaceholder")}
+              helpText={t("sizingSystems.chartHelp")}
+            />
             <TextField
               label={t("sizingSystems.notesLabel")}
               value={editing?.customNotes ?? ""}
