@@ -76,7 +76,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "grid.col.inseam": "Nogawka",
     "grid.addRow": "+ Dodaj rozmiar",
     "grid.removeRow": "Usuń rozmiar",
-    "grid.addMeasurement": "+ Dodaj wymiar",
+    "grid.addMeasurement": "+ Dodaj rodzaj pomiaru",
     "grid.removeCol": "Usuń kolumnę: {name}",
     "grid.unusualCols":
       "{names} zwykle nie dotyczy kategorii „{category}” — sprawdź, czy to zamierzone.",
@@ -508,7 +508,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "grid.col.inseam": "Inseam",
     "grid.addRow": "+ Add size",
     "grid.removeRow": "Remove size",
-    "grid.addMeasurement": "+ Add measurement",
+    "grid.addMeasurement": "+ Add measurement type",
     "grid.removeCol": "Remove column: {name}",
     "grid.unusualCols":
       "{names} doesn't usually apply to the “{category}” category — check this is intentional.",
