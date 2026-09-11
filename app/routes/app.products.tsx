@@ -277,7 +277,6 @@ export default function ProductsConfig() {
   const [notes, setNotes] = useState("");
   const [sizeText, setSizeText] = useState("");
   const [gridRows, setGridRows] = useState<GridRow[]>([]);
-  const [suggestedRows, setSuggestedRows] = useState<GridRow[]>([]);
   const [image, setImage] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"save" | "delete" | null>(null);
@@ -318,12 +317,6 @@ export default function ProductsConfig() {
       setImage(existing?.sizeChartImage || null);
       setImageError(null);
       setActionError(null);
-      const extractionRows =
-        extractions[productId]?.state === "ok"
-          ? extractions[productId].summary.rows
-          : [];
-      const suggested = rowsToGrid(extractionRows);
-      setSuggestedRows(suggested);
       const structured = structuredByProduct[productId];
       // Prosta, przewidywalna zasada: tabela pokazuje dokładnie to, co jest
       // zapisane — albo nic. Żadnego zgadywania/auto-podstawiania w tle.
@@ -332,7 +325,7 @@ export default function ProductsConfig() {
       // decyduje, kiedy (i czy w ogóle) chce ją wciągnąć do edycji.
       setGridRows(structured ? rowsToGrid(structured) : []);
     },
-    [rulesById, extractions, structuredByProduct],
+    [rulesById, structuredByProduct],
   );
 
   const openPicker = useCallback(async () => {
@@ -501,6 +494,15 @@ export default function ProductsConfig() {
     editing && rulesById.has(editing.productId)
       ? extractions[editing.productId]
       : undefined;
+  // Reaktywne, nie useState: musi się przeliczyć samo, gdy po zapisie (okno
+  // zostaje otwarte, patrz save()) dojedzie świeża analiza AI — inaczej
+  // przycisk "Wypełnij z ostatniej analizy AI" zostawałby ukryty (pusty od
+  // otwarcia edytora, zanim analiza dla NOWEGO produktu w ogóle istniała) aż
+  // do zamknięcia i ponownego otwarcia edytora.
+  const suggestedRows =
+    editingExtraction?.state === "ok"
+      ? rowsToGrid(editingExtraction.summary.rows)
+      : [];
 
   const atLimit = rules.length >= productLimit;
   const limitLabel =

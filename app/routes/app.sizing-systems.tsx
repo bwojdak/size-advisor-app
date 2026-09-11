@@ -36,7 +36,6 @@ import {
   rowsToGrid,
   gridToPayload,
   type GridRow,
-  type GarmentCategory,
 } from "../components/SizeGrid";
 
 const MAX_IMAGE_BYTES = 2.5 * 1024 * 1024;
@@ -229,8 +228,6 @@ type Editing =
       customNotes: string;
       image: string | null;
       gridRows: GridRow[];
-      suggestedRows: GridRow[];
-      category: GarmentCategory | null;
     }
   | null;
 
@@ -254,8 +251,6 @@ export default function SizingSystemsPage() {
       customNotes: "",
       image: null,
       gridRows: [],
-      suggestedRows: [],
-      category: null,
     });
   };
   // Prosta, przewidywalna zasada: tabela pokazuje dokładnie to, co jest
@@ -265,7 +260,6 @@ export default function SizingSystemsPage() {
   // wiele produktów naraz, więc błąd AI w odczycie ma tu większy zasięg niż
   // przy pojedynczym produkcie — jedno świadome kliknięcie to tania polisa.
   const openEdit = (s: SystemView) => {
-    const suggestedRows = rowsToGrid(s.suggestedRows);
     setImageError(null);
     setEditing({
       id: s.id,
@@ -274,10 +268,21 @@ export default function SizingSystemsPage() {
       customNotes: s.customNotes,
       image: s.sizeChartImage,
       gridRows: s.structuredRows.length ? rowsToGrid(s.structuredRows) : [],
-      suggestedRows,
-      category: s.extraction.state === "ok" ? s.extraction.summary.category : null,
     });
   };
+  // Reaktywne, nie w Editing: muszą się przeliczyć same, gdy po zapisie
+  // (okno zostaje otwarte, patrz save()) dojedzie świeża analiza AI —
+  // inaczej "Wypełnij z ostatniej analizy AI" zostawałby ukryty/nieaktualny
+  // (pusty od otwarcia edytora, zanim analiza dla NOWEGO systemu w ogóle
+  // istniała) aż do zamknięcia i ponownego otwarcia edytora.
+  const editingSystem = editing
+    ? systems.find((s) => s.id === editing.id)
+    : undefined;
+  const suggestedRows = editingSystem ? rowsToGrid(editingSystem.suggestedRows) : [];
+  const category =
+    editingSystem?.extraction.state === "ok"
+      ? editingSystem.extraction.summary.category
+      : null;
 
   const handleImageDrop = useCallback(
     (_files: File[], accepted: File[]) => {
@@ -566,17 +571,15 @@ export default function SizingSystemsPage() {
                 onChange={(rows) =>
                   setEditing((e) => (e ? { ...e, gridRows: rows } : e))
                 }
-                category={editing?.category ?? null}
+                category={category}
               />
-              {editing?.suggestedRows.length ? (
+              {suggestedRows.length ? (
                 <InlineStack>
                   <Button
                     size="slim"
                     variant="plain"
                     onClick={() =>
-                      setEditing((e) =>
-                        e ? { ...e, gridRows: e.suggestedRows } : e,
-                      )
+                      setEditing((e) => (e ? { ...e, gridRows: suggestedRows } : e))
                     }
                   >
                     {t("grid.prefillFromAi")}

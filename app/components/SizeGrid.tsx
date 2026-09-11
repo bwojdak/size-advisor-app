@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActionList,
   BlockStack,
@@ -145,6 +145,25 @@ export function SizeGrid({
       ? ALL_COLS.map((c) => c.key).filter((k) => allowed.includes(k))
       : ALL_COLS.map((c) => c.key);
   });
+  // Dla NOWEGO produktu/systemu `category` jest jeszcze nieznana, gdy ten
+  // komponent się montuje (pierwsza analiza AI jeszcze się nie wykonała) —
+  // powyższy useState wtedy pokazuje wszystkie 5 kolumn. Skoro modal zostaje
+  // teraz otwarty po zapisie, ta sama instancja SizeGrid dostaje później
+  // świeżo poznaną kategorię jako PROP — ale useState się nie przelicza samo.
+  // Efekt niżej odpala się TYLKO RAZ, w momencie gdy kategoria faktycznie
+  // staje się znana po raz pierwszy (null -> coś), i TYLKO gdy tabela wciąż
+  // jest pusta (rows.length === 0, czyli admin jeszcze nic nie dodał ręcznie)
+  // — inaczej dorzuciłby z powrotem kolumnę, którą admin świadomie usunął.
+  const knewCategoryRef = useRef(category != null);
+  useEffect(() => {
+    const alreadyKnew = knewCategoryRef.current;
+    knewCategoryRef.current = category != null;
+    if (alreadyKnew || !category || rows.length > 0) return;
+    const allowed = DIMS_BY_CATEGORY[category];
+    setVisibleDims(ALL_COLS.map((c) => c.key).filter((k) => allowed.includes(k)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category]);
+
   const COLS = ALL_COLS.filter((c) => visibleDims.includes(c.key));
   const hiddenCols = ALL_COLS.filter((c) => !visibleDims.includes(c.key));
   // Miękkie ostrzeżenie, nie blokada — ufamy, że sprzedawca wie, co wpisuje,
