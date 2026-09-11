@@ -254,7 +254,7 @@ export default function SizingSystemsPage() {
     setSaving(true);
     setError(null);
     try {
-      await authFetch(
+      const res = await authFetch(
         "/app/sizing-system",
         {
           id: editing.id ?? undefined,
@@ -266,7 +266,15 @@ export default function SizingSystemsPage() {
         locale,
       );
       toast(t("settings.brand.saved"));
-      setEditing(null);
+      // Okno zostaje otwarte po zapisie — sprzedawca od razu widzi w siatce,
+      // że zmiana faktycznie przeszła, zamiast zgadywać po ponownym otwarciu
+      // edytora (gdzie i tak trzeba by kliknąć "Edytuj" jeszcze raz). Przy
+      // TWORZENIU nowego systemu podmieniamy editing.id na to, co zwrócił
+      // serwer — inaczej kolejny "Zapisz" próbowałby stworzyć drugi system
+      // o tej samej nazwie zamiast zaktualizować pierwszy.
+      if (!editing.id && res?.id) {
+        setEditing((e) => (e ? { ...e, id: res.id } : e));
+      }
       revalidator.revalidate();
     } catch (err) {
       setError(

@@ -378,8 +378,9 @@ export default function ProductsConfig() {
         },
         locale,
       );
-      setEditing(null);
       toast(t("products.saved"));
+      // Okno zostaje otwarte po zapisie — od razu widać w siatce, że zmiana
+      // faktycznie przeszła, zamiast zgadywać po ponownym otwarciu edytora.
       revalidator.revalidate();
     } catch (err) {
       setActionError(
