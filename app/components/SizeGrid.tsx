@@ -1,6 +1,30 @@
-import { Fragment, useCallback } from "react";
-import { BlockStack, Box, Button, Text, TextField } from "@shopify/polaris";
+import { Fragment, useCallback, useState } from "react";
+import {
+  BlockStack,
+  Box,
+  Button,
+  InlineStack,
+  Select,
+  Text,
+  TextField,
+} from "@shopify/polaris";
 import { useI18n } from "../lib/i18n";
+
+const CM_PER_IN = 2.54;
+const round1 = (n: number) => Math.round(n * 10) / 10;
+// Siatka trzyma wartości ZAWSZE w cm (tak zapisujemy i tak liczy silnik).
+// Jednostka to tylko wygoda przy wpisywaniu — przelicza przy wyświetlaniu i
+// przy zapisie pojedynczej komórki, sama siatka (GridRow) tego nie widzi.
+const cmToDisplay = (cm: string, unit: "cm" | "in") => {
+  if (!cm) return "";
+  const n = Number(cm);
+  return Number.isFinite(n) ? String(unit === "in" ? round1(n / CM_PER_IN) : n) : cm;
+};
+const displayToCm = (val: string, unit: "cm" | "in") => {
+  if (!val) return "";
+  const n = Number(val);
+  return Number.isFinite(n) ? String(unit === "in" ? round1(n * CM_PER_IN) : n) : val;
+};
 
 // Siatka wymiarów zweryfikowana przez sprzedawcę — wiersz na rozmiar. Puste
 // pola = wymiar nie dotyczy tego produktu. Wartości trzymane jako string (pola
@@ -55,6 +79,11 @@ export function gridToPayload(rows: GridRow[]): string | null {
   return clean.length >= 2 ? JSON.stringify(clean) : null;
 }
 
+// Zamknięta lista — to są jedyne punkty pomiarowe, które silnik faktycznie
+// rozumie i używa do wyliczenia rozmiaru (obwód klatki/pasa/bioder do grading
+// po obwodzie, długość/nogawka do grading po długości). Sprzedawca WYBIERA z
+// tej listy, nie wpisuje własnej nazwy — inaczej dodana kolumna byłaby tylko
+// martwymi danymi, które nic nie liczy.
 const ALL_COLS: Array<{ key: keyof GridRow; labelKey: string; ph: string }> = [
   { key: "chest", labelKey: "grid.col.chest", ph: "110" },
   { key: "waist", labelKey: "grid.col.waist", ph: "96" },
@@ -86,8 +115,45 @@ export function SizeGrid({
   category?: GarmentCategory | null;
 }) {
   const { t } = useI18n();
-  const allowed = category ? DIMS_BY_CATEGORY[category] : null;
-  const COLS = allowed ? ALL_COLS.filter((c) => allowed.includes(c.key)) : ALL_COLS;
+  const [unit, setUnit] = useState<"cm" | "in">("cm");
+  // Domyślne kolumny z kategorii (raz, przy otwarciu edytora) — dalej
+  // sprzedawca dowolnie dodaje/usuwa z zamkniętej listy ALL_COLS.
+  const [visibleDims, setVisibleDims] = useState<Array<keyof GridRow>>(() => {
+    const allowed = category ? DIMS_BY_CATEGORY[category] : null;
+    return allowed
+      ? ALL_COLS.map((c) => c.key).filter((k) => allowed.includes(k))
+      : ALL_COLS.map((c) => c.key);
+  });
+  const COLS = ALL_COLS.filter((c) => visibleDims.includes(c.key));
+  const hiddenCols = ALL_COLS.filter((c) => !visibleDims.includes(c.key));
+  // Miękkie ostrzeżenie, nie blokada — ufamy, że sprzedawca wie, co wpisuje,
+  // ale kolumna spoza typowego zestawu dla tej kategorii (np. nogawka na
+  // koszulce) zwykle jest pomyłką przy klikaniu „+ Dodaj wymiar".
+  const unusualCols = category
+    ? COLS.filter((c) => !DIMS_BY_CATEGORY[category].includes(c.key))
+    : [];
+  // Miękkie ostrzeżenie #2: kolumna jest widoczna (bo pasuje do kategorii albo
+  // sprzedawca ją dodał), ale przynajmniej jeden rozmiar nie ma dla niej
+  // wartości — zwykle po prostu zapomniane pole, nie celowy brak.
+  const rowsWithSize = rows.filter((r) => r.size.trim());
+  const incompleteCols = COLS.filter(
+    (c) =>
+      rowsWithSize.length > 0 &&
+      rowsWithSize.some((r) => !r[c.key].trim()),
+  );
+  const missingSizesFor = useCallback(
+    (key: keyof GridRow) =>
+      rowsWithSize.filter((r) => !r[key].trim()).map((r) => r.size),
+    [rowsWithSize],
+  );
+  const removeCol = useCallback(
+    (key: keyof GridRow) => setVisibleDims((v) => v.filter((k) => k !== key)),
+    [],
+  );
+  const addCol = useCallback((key: string) => {
+    if (!key) return;
+    setVisibleDims((v) => (v.includes(key as keyof GridRow) ? v : [...v, key as keyof GridRow]));
+  }, []);
 
   const setCell = useCallback(
     (i: number, key: keyof GridRow, value: string) => {
@@ -108,28 +174,89 @@ export function SizeGrid({
 
   return (
     <BlockStack gap="150">
-      <Text as="span" variant="bodyMd" fontWeight="medium">
-        {t("grid.title")}
-      </Text>
+      <InlineStack align="space-between" blockAlign="center">
+        <Text as="span" variant="bodyMd" fontWeight="medium">
+          {t("grid.title")}
+        </Text>
+        <InlineStack gap="0">
+          {(["cm", "in"] as const).map((u) => (
+            <Button
+              key={u}
+              size="micro"
+              pressed={unit === u}
+              onClick={() => setUnit(u)}
+            >
+              {u}
+            </Button>
+          ))}
+        </InlineStack>
+      </InlineStack>
       <Text as="p" variant="bodyXs" tone="subdued">
         {t("grid.help")}
       </Text>
+      {unusualCols.length && category ? (
+        <Text as="p" variant="bodyXs" tone="caution">
+          {t("grid.unusualCols", {
+            names: unusualCols.map((c) => t(c.labelKey)).join(", "),
+            category: t(`products.extraction.cat.${category}`),
+          })}
+        </Text>
+      ) : null}
+      {incompleteCols.length ? (
+        <Text as="p" variant="bodyXs" tone="caution">
+          {t("grid.incompleteCols", {
+            details: incompleteCols
+              .map((c) => `${t(c.labelKey)} (${missingSizesFor(c.key).join(", ")})`)
+              .join("; "),
+          })}
+        </Text>
+      ) : null}
       {rows.length > 0 ? (
         <Box overflowX="scroll" paddingBlockEnd="100">
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: `72px repeat(${COLS.length}, 74px) 28px`,
+              gridTemplateColumns: `72px repeat(${COLS.length}, 84px) 28px`,
               gap: "6px",
               alignItems: "end",
-              minWidth: `${100 + COLS.length * 80}px`,
+              minWidth: `${100 + COLS.length * 90}px`,
             }}
           >
             <span />
             {COLS.map((c) => (
-              <Text as="span" key={c.key} variant="bodyXs" tone="subdued">
-                {t(c.labelKey)}
-              </Text>
+              <div
+                key={c.key}
+                style={{ display: "flex", alignItems: "center", gap: "3px" }}
+              >
+                <Text
+                  as="span"
+                  variant="bodyXs"
+                  tone={
+                    unusualCols.includes(c) || incompleteCols.includes(c)
+                      ? "caution"
+                      : "subdued"
+                  }
+                >
+                  {t(c.labelKey)}
+                </Text>
+                <button
+                  type="button"
+                  onClick={() => removeCol(c.key)}
+                  aria-label={t("grid.removeCol", { name: t(c.labelKey) })}
+                  style={{
+                    border: 0,
+                    background: "none",
+                    padding: 0,
+                    margin: 0,
+                    color: "var(--p-color-text-secondary, #6b7280)",
+                    cursor: "pointer",
+                    fontSize: "11px",
+                    lineHeight: 1,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
             ))}
             <span />
             {rows.map((row, i) => (
@@ -148,11 +275,12 @@ export function SizeGrid({
                     key={c.key}
                     label={t(c.labelKey)}
                     labelHidden
-                    type="number"
-                    value={row[c.key]}
-                    onChange={(v) => setCell(i, c.key, v)}
+                    type="text"
+                    inputMode="decimal"
+                    value={cmToDisplay(row[c.key], unit)}
+                    onChange={(v) => setCell(i, c.key, displayToCm(v, unit))}
                     autoComplete="off"
-                    placeholder={c.ph}
+                    placeholder={cmToDisplay(c.ph, unit)}
                     size="slim"
                   />
                 ))}
@@ -169,11 +297,26 @@ export function SizeGrid({
           </div>
         </Box>
       ) : null}
-      <Box>
+      <InlineStack gap="200" blockAlign="center">
         <Button onClick={addRow} size="slim">
           {t("grid.addRow")}
         </Button>
-      </Box>
+        {hiddenCols.length ? (
+          <div style={{ width: "200px" }}>
+            <Select
+              label={t("grid.addMeasurement")}
+              labelHidden
+              placeholder={t("grid.addMeasurement")}
+              value=""
+              onChange={addCol}
+              options={[
+                { label: t("grid.addMeasurement"), value: "" },
+                ...hiddenCols.map((c) => ({ label: t(c.labelKey), value: c.key })),
+              ]}
+            />
+          </div>
+        ) : null}
+      </InlineStack>
     </BlockStack>
   );
 }

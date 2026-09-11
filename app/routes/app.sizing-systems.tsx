@@ -528,27 +528,15 @@ export default function SizingSystemsPage() {
               ) : null}
             </BlockStack>
             <TextField
-              label={t("sizingSystems.chartLabel")}
-              value={editing?.parsedSizeData ?? ""}
-              onChange={(v) =>
-                setEditing((e) => (e ? { ...e, parsedSizeData: v } : e))
-              }
-              multiline={4}
-              autoComplete="off"
-              maxLength={3000}
-              monospaced
-              placeholder={t("sizingSystems.chartPlaceholder")}
-              helpText={t("sizingSystems.chartHelp")}
-            />
-            <TextField
               label={t("sizingSystems.notesLabel")}
               value={editing?.customNotes ?? ""}
               onChange={(v) =>
                 setEditing((e) => (e ? { ...e, customNotes: v } : e))
               }
-              multiline={2}
+              multiline={4}
               autoComplete="off"
               maxLength={1500}
+              helpText={t("sizingSystems.notesHelp")}
               placeholder={t("sizingSystems.notesPlaceholder")}
             />
             {error ? (

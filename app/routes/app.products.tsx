@@ -936,18 +936,6 @@ export default function ProductsConfig() {
               placeholder={t("products.field.notes.placeholder")}
             />
 
-            <TextField
-              label={t("products.field.sizeText.label")}
-              value={sizeText}
-              onChange={setSizeText}
-              multiline={4}
-              autoComplete="off"
-              maxLength={3000}
-              showCharacterCount
-              helpText={t("products.field.sizeText.help")}
-              placeholder={t("products.field.sizeText.placeholder")}
-            />
-
             <BlockStack gap="200">
               <Text as="span" variant="bodyMd" fontWeight="medium">
                 {t("products.field.image.label")}

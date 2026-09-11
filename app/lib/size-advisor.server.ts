@@ -547,8 +547,12 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
   const useWaist = category === "bottom";
   let mode: "chest" | "waist" | "length" = useWaist ? "waist" : "chest";
 
-  // Normalizacja połówek obwodu → pełny obwód, na CAŁEJ tabeli.
-  const isHalf = (key: "chest" | "waist") => {
+  // Normalizacja połówek obwodu → pełny obwód, na CAŁEJ tabeli. W branży
+  // klatka/pas/biodra w tabelach rozmiarów są NAJCZĘŚCIEJ podawane na płasko
+  // (pacha–pacha, pas/biodra na płasko), a nie jako pełny obwód — dotyczy to
+  // zarówno tabel przepisanych przez AI, jak i siatki wpisanej ręcznie przez
+  // sprzedawcę (structuredSizeData), bo obie kończą jako `extraction.rows`.
+  const isHalf = (key: "chest" | "waist" | "hip") => {
     const vals = rows
       .map((r) => r[key])
       .filter((v): v is number => typeof v === "number" && v > 0);
@@ -556,16 +560,18 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
   };
   const chestHalf = isHalf("chest");
   const waistHalf = isHalf("waist");
-  if (chestHalf || waistHalf) {
+  const hipHalf = isHalf("hip");
+  if (chestHalf || waistHalf || hipHalf) {
     rows = rows.map((r) => ({
       ...r,
       chest: chestHalf && r.chest ? r.chest * 2 : r.chest,
       waist: waistHalf && r.waist ? r.waist * 2 : r.waist,
+      hip: hipHalf && r.hip ? r.hip * 2 : r.hip,
     }));
   }
-  // Sanity: obwód klatki/pasa > ~135 cm dla NAJMNIEJSZEGO rozmiaru to prawie
-  // na pewno błąd modelu (podwojona wartość, która już była pełna). Cofnij ×2.
-  for (const key of ["chest", "waist"] as const) {
+  // Sanity: obwód klatki/pasa/bioder > ~135 cm dla NAJMNIEJSZEGO rozmiaru to
+  // prawie na pewno błąd (podwojona wartość, która już była pełna). Cofnij ×2.
+  for (const key of ["chest", "waist", "hip"] as const) {
     const vals = rows
       .map((r) => r[key])
       .filter((v): v is number => typeof v === "number" && v > 0);
