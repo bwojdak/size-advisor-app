@@ -1,4 +1,11 @@
-import { type ChangeEvent, useCallback, useMemo, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link, useLoaderData, useRevalidator } from "react-router";
 import {
@@ -267,6 +274,10 @@ export default function ProductsConfig() {
   const [sizeText, setSizeText] = useState("");
   const [gridRows, setGridRows] = useState<GridRow[]>([]);
   const [suggestedRows, setSuggestedRows] = useState<GridRow[]>([]);
+  // Produkt, dla którego już podstawiliśmy tabelę z analizy AI automatycznie
+  // (patrz efekt niżej) — nie robimy tego drugi raz dla tego samego produktu
+  // w tej sesji, żeby nie nadpisywać świadomie wyczyszczonej tabeli.
+  const [autoFilledFor, setAutoFilledFor] = useState<string | null>(null);
   const [image, setImage] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"save" | "delete" | null>(null);
@@ -318,6 +329,28 @@ export default function ProductsConfig() {
     },
     [rulesById, extractions, structuredByProduct],
   );
+
+  // Zdjęcie/opis dodane do NOWEGO produktu (bez wcześniejszej analizy) nie
+  // ma jeszcze sugerowanych wierszy w momencie otwarcia edytora — pojawiają
+  // się dopiero po zapisie, który w tle odpala analizę AI. Skoro okno zostaje
+  // teraz otwarte po zapisie (patrz save()), gdy ta analiza dojedzie i tabela
+  // wciąż jest pusta, podstawiamy jej wyniki automatycznie — bez tego trzeba
+  // by zamknąć i otworzyć edytor jeszcze raz, żeby zobaczyć przycisk
+  // "Wypełnij z ostatniej analizy AI". Nadal NIE zapisujemy tego automatycznie
+  // do bazy — to tylko wypełnienie formularza, admin i tak musi kliknąć
+  // Zapisz, żeby to zatwierdzić jako zweryfikowaną tabelę.
+  useEffect(() => {
+    if (!editing) return;
+    if (gridRows.length > 0) return;
+    if (autoFilledFor === editing.productId) return;
+    const ext = extractions[editing.productId];
+    if (ext?.state !== "ok" || ext.summary.rows.length === 0) return;
+    const suggested = rowsToGrid(ext.summary.rows);
+    setSuggestedRows(suggested);
+    setGridRows(suggested);
+    setAutoFilledFor(editing.productId);
+    toast(t("products.extraction.autoFilledGrid"));
+  }, [editing, extractions, gridRows.length, autoFilledFor, t]);
 
   const openPicker = useCallback(async () => {
     const api = (window as unknown as {

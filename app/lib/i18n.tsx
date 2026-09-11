@@ -64,7 +64,7 @@ const messages: Record<Locale, Record<string, string>> = {
       "Rozmiar S: klatka 114, długość 68\nRozmiar M: klatka 120, długość 70\n...",
     "sizingSystems.chartHelp":
       "Liczby bierzemy z siatki powyżej — to pole służy tylko do rozpoznania kroju, materiału i kategorii przez AI. Możesz wkleić oryginalną tabelę sprzedawcy jako podpowiedź albo zostawić puste.",
-    "grid.title": "Zweryfikowana siatka wymiarów",
+    "grid.title": "Zweryfikowana tabela rozmiarów",
     "grid.help":
       "Wpisz dokładne wymiary per rozmiar — to nadpisuje odczyt AI i eliminuje pomyłki w tabeli (np. pomylony obwód z połową obwodu). Klatkę/pas/biodra możesz podać na płasko (pacha–pacha, tak jak zwykle jest na metce) albo jako pełny obwód — rozpoznamy automatycznie po wielkości liczb, nie musisz przeliczać. Kolumny to zamknięta lista standardowych punktów pomiarowych branży odzieżowej — dodawaj/usuwaj wg produktu. Zostaw puste pole, jeśli wymiar nie dotyczy.",
     "grid.col.size": "Rozmiar",
@@ -302,6 +302,8 @@ const messages: Record<Locale, Record<string, string>> = {
     "products.extraction.title": "Co zrozumiała AI",
     "products.extraction.reanalyze": "Przeanalizuj ponownie",
     "products.extraction.reanalyzed": "Produkt przeanalizowany ponownie",
+    "products.extraction.autoFilledGrid":
+      "Tabela wypełniona automatycznie z nowej analizy AI — sprawdź liczby przed zapisem.",
     "products.extraction.reanalyzeFailed": "Nie udało się przeanalizować teraz",
     "products.extraction.help":
       "Analiza robiona raz przy zapisie i używana przy każdym zapytaniu bez wołania modelu. Zmień tabelę / opis i zapisz, albo kliknij „Przeanalizuj ponownie”.",
@@ -493,7 +495,7 @@ const messages: Record<Locale, Record<string, string>> = {
       "Size S: chest 114, length 68\nSize M: chest 120, length 70\n...",
     "sizingSystems.chartHelp":
       "Numbers come from the grid above — this field is only used to help the AI recognise the cut, material and category. Paste the original chart as a hint, or leave it blank.",
-    "grid.title": "Verified measurement grid",
+    "grid.title": "Verified size table",
     "grid.help":
       "Type exact measurements per size — this overrides the AI's reading of the chart and removes parsing mistakes (e.g. a full measurement mistaken for a half one). Chest/waist/hip can be given laid flat (armpit-to-armpit, the way it's usually printed on the tag) or as a full circumference — we detect which one automatically from the size of the numbers, no need to convert. The columns are a closed list of standard apparel-industry measurement points — add/remove per product. Leave a field blank where it doesn't apply.",
     "grid.col.size": "Size",
@@ -730,6 +732,8 @@ const messages: Record<Locale, Record<string, string>> = {
     "products.extraction.title": "What the AI understood",
     "products.extraction.reanalyze": "Re-analyze",
     "products.extraction.reanalyzed": "Product re-analyzed",
+    "products.extraction.autoFilledGrid":
+      "Table auto-filled from the new AI analysis — check the numbers before saving.",
     "products.extraction.reanalyzeFailed": "Could not analyze right now",
     "products.extraction.help":
       "Analyzed once on save and reused on every request without calling the model. Change the chart / description and save, or hit “Re-analyze”.",
