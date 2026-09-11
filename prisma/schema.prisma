@@ -118,6 +118,7 @@ model SizingSystem {
   parsedSizeData     String? // Tabela wymiarów wklejona tekstem
   structuredSizeData String? // Zweryfikowana siatka wymiarów (JSON) — patrz ProductRule
   customNotes        String? // Notatki dla AI dotyczące tego systemu
+  sizeChartImage     String? // Zdjęcie rozmiarówki jako data URL (base64) — patrz ProductRule
 
   extractionJson    String? // surowy JSON modelu (ChartExtraction źródłowy)
   extractionAt      DateTime?

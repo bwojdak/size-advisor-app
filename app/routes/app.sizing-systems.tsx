@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useRevalidator } from "react-router";
 import {
@@ -7,17 +7,21 @@ import {
   Box,
   Button,
   Card,
+  DropZone,
   InlineStack,
   Layout,
   Modal,
   Page,
   Text,
   TextField,
+  Thumbnail,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { loadShopSettings } from "../lib/shop-settings.server";
+import { planCaps } from "../lib/plans";
 import { useI18n, type Locale } from "../lib/i18n";
+import { LockedFeature } from "../components/LockedFeature";
 import {
   parseStoredExtraction,
   parseStructuredRows,
@@ -35,6 +39,8 @@ import {
   type GarmentCategory,
 } from "../components/SizeGrid";
 
+const MAX_IMAGE_BYTES = 2.5 * 1024 * 1024;
+
 type Summary = ReturnType<typeof describeExtraction>;
 type AttachedProduct = { id: string; title: string };
 type SystemView = {
@@ -42,6 +48,7 @@ type SystemView = {
   name: string;
   parsedSizeData: string;
   customNotes: string;
+  sizeChartImage: string | null;
   mapped: number;
   products: AttachedProduct[];
   /** Zweryfikowana siatka (jeśli sprzedawca ją zapisał) — do seedowania edytora. */
@@ -57,6 +64,7 @@ type SystemView = {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const settings = await loadShopSettings(session.shop);
+  const caps = planCaps(settings.plan);
 
   const systems = await db.sizingSystem.findMany({
     where: { shopId: settings.id },
@@ -102,6 +110,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       name: s.name,
       parsedSizeData: s.parsedSizeData ?? "",
       customNotes: s.customNotes ?? "",
+      sizeChartImage: s.sizeChartImage ?? null,
       mapped: attached.length,
       products: attached,
       structuredRows: parseStructuredRows(s.structuredSizeData) ?? [],
@@ -110,7 +119,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     };
   });
 
-  return { systems: views };
+  return { systems: views, sizeChartImageAI: caps.sizeChartImageAI };
 };
 
 async function authFetch(url: string, body: unknown, locale: Locale) {
@@ -218,14 +227,19 @@ type Editing =
       name: string;
       parsedSizeData: string;
       customNotes: string;
+      image: string | null;
       gridRows: GridRow[];
       suggestedRows: GridRow[];
       category: GarmentCategory | null;
+      /** true tylko zaraz po tym, jak tabelę wypełniła automatycznie analiza
+       *  ZDJĘCIA (patrz save()/reanalyze()) — pokazuje ostrzeżenie "sprawdź to"
+       *  dopóki admin czegoś nie zmieni w siatce albo nie zapisze ponownie. */
+      unverifiedFromImage: boolean;
     }
   | null;
 
 export default function SizingSystemsPage() {
-  const { systems } = useLoaderData<typeof loader>();
+  const { systems, sizeChartImageAI } = useLoaderData<typeof loader>();
   const { t, locale } = useI18n();
   const revalidator = useRevalidator();
 
@@ -233,30 +247,75 @@ export default function SizingSystemsPage() {
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
 
-  const openNew = () =>
+  const openNew = () => {
+    setImageError(null);
     setEditing({
       id: null,
       name: "",
       parsedSizeData: "",
       customNotes: "",
+      image: null,
       gridRows: [],
       suggestedRows: [],
       category: null,
+      unverifiedFromImage: false,
     });
+  };
   // Prosta, przewidywalna zasada: tabela pokazuje dokładnie to, co jest
   // zapisane — albo nic. Sugestię z ostatniej analizy AI dostaje się
-  // WYŁĄCZNIE explicit kliknięciem „Wypełnij z ostatniej analizy AI" niżej.
+  // WYŁĄCZNIE explicit kliknięciem „Wypełnij z ostatniej analizy AI" niżej
+  // (albo automatycznie zaraz po analizie ZDJĘCIA — patrz save()/reanalyze()).
   const openEdit = (s: SystemView) => {
     const suggestedRows = rowsToGrid(s.suggestedRows);
+    setImageError(null);
     setEditing({
       id: s.id,
       name: s.name,
       parsedSizeData: s.parsedSizeData,
       customNotes: s.customNotes,
+      image: s.sizeChartImage,
       gridRows: s.structuredRows.length ? rowsToGrid(s.structuredRows) : [],
       suggestedRows,
       category: s.extraction.state === "ok" ? s.extraction.summary.category : null,
+      unverifiedFromImage: false,
+    });
+  };
+
+  const handleImageDrop = useCallback(
+    (_files: File[], accepted: File[]) => {
+      const file = accepted[0];
+      if (!file) return;
+      if (file.size > MAX_IMAGE_BYTES) {
+        setImageError(t("products.error.tooLarge"));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setEditing((e) => (e ? { ...e, image: String(reader.result) } : e));
+        setImageError(null);
+      };
+      reader.readAsDataURL(file);
+    },
+    [t],
+  );
+
+  // Gdy analiza ZDJĘCIA znajdzie wymiary, a admin jeszcze nic nie wpisał do
+  // tabeli ręcznie (gridRows puste) — podstawiamy je od razu, żeby nie trzeba
+  // było osobno klikać "Wypełnij z ostatniej analizy AI". To wciąż tylko
+  // szkic w formularzu, nie zapis do bazy — i dostaje wyraźne ostrzeżenie
+  // (unverifiedFromImage), które znika dopiero gdy admin coś zmieni w siatce
+  // albo zapisze ponownie, świadomie to akceptując.
+  const applyImageAutoFill = (result: {
+    summary?: Summary | null;
+    fromImage?: boolean;
+  }) => {
+    if (!result.fromImage || !result.summary?.rows.length) return;
+    const rows = rowsToGrid(result.summary.rows);
+    setEditing((e) => {
+      if (!e || e.gridRows.length > 0) return e;
+      return { ...e, gridRows: rows, suggestedRows: rows, unverifiedFromImage: true };
     });
   };
 
@@ -273,6 +332,7 @@ export default function SizingSystemsPage() {
           parsedSizeData: editing.parsedSizeData,
           customNotes: editing.customNotes,
           structuredSizeData: gridToPayload(editing.gridRows),
+          sizeChartImage: editing.image,
         },
         locale,
       );
@@ -286,6 +346,7 @@ export default function SizingSystemsPage() {
       if (!editing.id && res?.id) {
         setEditing((e) => (e ? { ...e, id: res.id } : e));
       }
+      applyImageAutoFill(res);
       revalidator.revalidate();
     } catch (err) {
       setError(
@@ -312,6 +373,7 @@ export default function SizingSystemsPage() {
           : t("products.extraction.reanalyzeFailed"),
         !r?.analyzed,
       );
+      if (editing?.id === id) applyImageAutoFill(r);
       revalidator.revalidate();
     } catch {
       toast(t("products.extraction.reanalyzeFailed"), true);
@@ -523,10 +585,19 @@ export default function SizingSystemsPage() {
               placeholder={t("sizingSystems.namePlaceholder")}
             />
             <BlockStack gap="150">
+              {editing?.unverifiedFromImage ? (
+                <Box padding="200" background="bg-surface-caution" borderRadius="100">
+                  <Text as="span" variant="bodySm" tone="caution">
+                    {t("grid.unverifiedFromImage")}
+                  </Text>
+                </Box>
+              ) : null}
               <SizeGrid
                 rows={editing?.gridRows ?? []}
                 onChange={(rows) =>
-                  setEditing((e) => (e ? { ...e, gridRows: rows } : e))
+                  setEditing((e) =>
+                    e ? { ...e, gridRows: rows, unverifiedFromImage: false } : e,
+                  )
                 }
                 category={editing?.category ?? null}
               />
@@ -558,6 +629,66 @@ export default function SizingSystemsPage() {
               helpText={t("sizingSystems.notesHelp")}
               placeholder={t("sizingSystems.notesPlaceholder")}
             />
+            <BlockStack gap="200">
+              <Text as="span" variant="bodyMd" fontWeight="medium">
+                {t("products.field.image.label")}
+              </Text>
+              {!sizeChartImageAI ? (
+                <LockedFeature note={t("gate.image_locked")}>
+                  <DropZone
+                    accept="image/png,image/jpeg,image/webp"
+                    type="image"
+                    allowMultiple={false}
+                    onDrop={() => {}}
+                  >
+                    <DropZone.FileUpload
+                      actionTitle={t("products.field.image.dropTitle")}
+                      actionHint={t("products.field.image.dropHint")}
+                    />
+                  </DropZone>
+                </LockedFeature>
+              ) : editing?.image ? (
+                <InlineStack gap="400" blockAlign="center">
+                  <Thumbnail
+                    source={editing.image}
+                    alt={t("products.field.image.previewAlt")}
+                    size="large"
+                  />
+                  <Button
+                    variant="plain"
+                    tone="critical"
+                    onClick={() =>
+                      setEditing((e) => (e ? { ...e, image: null } : e))
+                    }
+                  >
+                    {t("products.field.image.remove")}
+                  </Button>
+                </InlineStack>
+              ) : (
+                <DropZone
+                  accept="image/png,image/jpeg,image/webp"
+                  type="image"
+                  allowMultiple={false}
+                  onDrop={handleImageDrop}
+                >
+                  <DropZone.FileUpload
+                    actionTitle={t("products.field.image.dropTitle")}
+                    actionHint={t("products.field.image.dropHint")}
+                  />
+                </DropZone>
+              )}
+              {sizeChartImageAI ? (
+                imageError ? (
+                  <Text as="span" tone="critical" variant="bodyXs">
+                    {imageError}
+                  </Text>
+                ) : (
+                  <Text as="span" tone="subdued" variant="bodyXs">
+                    {t("products.field.image.note")}
+                  </Text>
+                )
+              ) : null}
+            </BlockStack>
             {error ? (
               <Text as="p" tone="critical" variant="bodySm">
                 {error}

@@ -3,13 +3,18 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { requestT } from "../lib/i18n";
 import { loadShopSettings } from "../lib/shop-settings.server";
+import { planCaps } from "../lib/plans";
 import {
   extractProductChart,
   getAIConfig,
   EXTRACTION_VERSION,
   parseStructuredRows,
   structuredRowsAsPromptText,
+  describeExtraction,
 } from "../lib/size-advisor.server";
+
+const MAX_IMAGE_CHARS = 3_600_000;
+const IMAGE_DATA_URL = /^data:image\/(png|jpe?g|webp);base64,/;
 
 type SystemRow = {
   id: string;
@@ -17,37 +22,41 @@ type SystemRow = {
   parsedSizeData: string | null;
   customNotes: string | null;
   structuredSizeData: string | null;
+  sizeChartImage: string | null;
 };
 
+type ExtractionSummary = ReturnType<typeof describeExtraction>;
+
 // Analiza AI systemu rozmiarów. Bez opisu produktu (system nie jest przypięty
-// do jednego produktu) — czytamy wyłącznie z wklejonej tabeli i notatek.
+// do jednego produktu) — czytamy z notatek, zweryfikowanej siatki (jako
+// kontekst liczbowy dla oceny kroju) i opcjonalnego zdjęcia rozmiarówki.
 async function runSystemExtraction(
   system: SystemRow,
-  opts: { brandStyleNotes: string | null; language: string | null },
-): Promise<boolean> {
+  opts: { brandStyleNotes: string | null; language: string | null; sizeChartImageAI: boolean },
+): Promise<{ analyzed: boolean; summary: ExtractionSummary | null; fromImage: boolean }> {
   const { provider, model } = getAIConfig();
   const apiKey =
     provider === "gemini" ? process.env.GEMINI_API_KEY : process.env.OPENAI_API_KEY;
-  if (!apiKey) return false;
+  const useImage = opts.sizeChartImageAI && Boolean(system.sizeChartImage);
+  if (!apiKey) return { analyzed: false, summary: null, fromImage: false };
 
   try {
-    const { rawJson } = await extractProductChart(model, {
+    const { extraction, rawJson } = await extractProductChart(model, {
       productTitle: system.name || null,
       productDescription: null,
       brandStyleNotes: opts.brandStyleNotes,
       // Patrz analogiczny komentarz w app.product-rule.ts: `parsedSizeData`
       // nie ma już swojego pola w edytorze, więc go nie wysyłamy. Zamiast
-      // tego, gdy jest zweryfikowana siatka, podajemy JĄ jako tabelę — bez
-      // tego, dla systemu bez zdjęcia (systemy go nie obsługują), AI nie
-      // miałoby żadnych liczb do oceny "krojLuz" i zgadywałoby wyłącznie z
-      // nazwy systemu.
+      // tego, gdy jest zweryfikowana siatka, podajemy JĄ jako tabelę — inaczej
+      // (bez zdjęcia) AI nie miałoby żadnych liczb do oceny "krojLuz" i
+      // zgadywałoby wyłącznie z nazwy systemu.
       productSizeData: (() => {
         const rows = parseStructuredRows(system.structuredSizeData);
         return rows ? structuredRowsAsPromptText(rows) : null;
       })(),
       productNotes: system.customNotes || null,
-      sizeChartImage: null,
-      hasSizeChartImage: false,
+      sizeChartImage: useImage ? system.sizeChartImage : null,
+      hasSizeChartImage: useImage,
       responseLanguage: opts.language === "en" ? "en" : "pl",
     });
     await db.sizingSystem.update({
@@ -60,7 +69,7 @@ async function runSystemExtraction(
         extractionError: null,
       },
     });
-    return true;
+    return { analyzed: true, summary: describeExtraction(extraction), fromImage: useImage };
   } catch (e) {
     console.error("[sizing-system] analiza nie powiodła się", e);
     await db.sizingSystem.update({
@@ -71,7 +80,7 @@ async function runSystemExtraction(
         extractionVersion: null,
       },
     });
-    return false;
+    return { analyzed: false, summary: null, fromImage: false };
   }
 }
 
@@ -79,6 +88,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const t = requestT(request);
   const settings = await loadShopSettings(session.shop);
+  const caps = planCaps(settings.plan);
 
   const form = (await request.json()) as {
     intent?: string;
@@ -87,11 +97,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     customNotes?: string;
     parsedSizeData?: string;
     structuredSizeData?: string | null;
+    sizeChartImage?: string | null;
   };
 
   const extractOpts = {
     brandStyleNotes: settings.aiStyleNotes ?? null,
     language: settings.language ?? null,
+    sizeChartImageAI: caps.sizeChartImageAI,
   };
 
   if (form.intent === "delete") {
@@ -114,8 +126,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (!existing) {
       return Response.json({ error: t("error.status", { status: 404 }) }, { status: 404 });
     }
-    const analyzed = await runSystemExtraction(existing, extractOpts);
-    return Response.json({ success: true, analyzed });
+    const result = await runSystemExtraction(existing, extractOpts);
+    return Response.json({ success: true, ...result });
   }
 
   const name = String(form.name || "").trim().slice(0, 80);
@@ -125,11 +137,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   // Siatka wymiarów przychodzi już jako JSON z panelu (SizeGrid.gridToPayload);
   // re-parsujemy przez parseStructuredRows, żeby nie zaufać ślepo klientowi.
   const structuredRows = parseStructuredRows(form.structuredSizeData ?? null);
+
+  let sizeChartImage: string | null = form.sizeChartImage ?? null;
+  if (sizeChartImage && !IMAGE_DATA_URL.test(sizeChartImage)) {
+    sizeChartImage = null;
+  }
+  if (sizeChartImage && !caps.sizeChartImageAI) {
+    return Response.json({ error: t("gate.image_locked") }, { status: 403 });
+  }
+  if (sizeChartImage && sizeChartImage.length > MAX_IMAGE_CHARS) {
+    return Response.json({ error: t("error.imageTooLarge") }, { status: 400 });
+  }
+
   const payload = {
     name,
     customNotes: String(form.customNotes || "").slice(0, 1500),
     parsedSizeData: String(form.parsedSizeData || "").slice(0, 3000),
     structuredSizeData: structuredRows ? JSON.stringify(structuredRows) : null,
+    sizeChartImage,
   };
 
   // Kolizja nazwy z innym systemem tego sklepu.
@@ -154,6 +179,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         data: { shopId: settings.id, ...payload },
       });
 
-  const analyzed = await runSystemExtraction(system, extractOpts);
-  return Response.json({ success: true, id: system.id, analyzed });
+  const result = await runSystemExtraction(system, extractOpts);
+  return Response.json({ success: true, id: system.id, ...result });
 };
