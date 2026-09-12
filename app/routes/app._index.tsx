@@ -21,7 +21,7 @@ import { CheckCircleIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { loadShopSettings } from "../lib/shop-settings.server";
-import { planCaps } from "../lib/plans";
+import { PLAN, planCaps } from "../lib/plans";
 import { useI18n } from "../lib/i18n";
 import { LockedFeature } from "../components/LockedFeature";
 
@@ -372,7 +372,7 @@ export default function Index() {
                   </Text>
                 </>
               ) : (
-                <LockedFeature note={t("gate.locked_from", { plan: "Growth" })}>
+                <LockedFeature note={t("gate.locked_from", { plan: PLAN.STARTER })}>
                   <Text as="p" variant="headingLg" fontWeight="bold">
                     —
                   </Text>

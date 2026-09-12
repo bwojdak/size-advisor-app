@@ -2,10 +2,10 @@ import { type LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { loadShopSettings } from "../lib/shop-settings.server";
-import { planCaps } from "../lib/plans";
+import { PLAN, planCaps } from "../lib/plans";
 import { requestT } from "../lib/i18n";
 
-// Szablon CSV do masowego importu rozmiarówek (plan Pro). Zwraca WSZYSTKIE
+// Szablon CSV do masowego importu rozmiarówek (Starter+). Zwraca WSZYSTKIE
 // produkty sklepu z wpisanym `product_id` + tytułem, żeby merchant nie musiał
 // ręcznie zdobywać numerycznych ID — dopisuje tylko wymiary i wgrywa z powrotem.
 // Kolumna `configured` (yes/pusto) mówi, które produkty mają już rozmiarówkę.
@@ -38,7 +38,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const settings = await loadShopSettings(session.shop);
 
   if (!planCaps(settings.plan).bulkImport) {
-    return new Response(t("gate.locked_from", { plan: "Pro" }), { status: 403 });
+    return new Response(t("gate.locked_from", { plan: PLAN.STARTER }), { status: 403 });
   }
 
   // Produkty, które MAJĄ już wpisaną tabelę wymiarów — oznaczamy w kolumnie

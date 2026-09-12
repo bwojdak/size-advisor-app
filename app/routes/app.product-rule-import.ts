@@ -2,10 +2,10 @@ import { type ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { loadShopSettings } from "../lib/shop-settings.server";
-import { planCaps } from "../lib/plans";
+import { PLAN, planCaps } from "../lib/plans";
 import { requestT } from "../lib/i18n";
 
-// Masowy import rozmiarówek z CSV (plan Pro). Wołane fetch-em z app.products.tsx.
+// Masowy import rozmiarówek z CSV (Starter+). Wołane fetch-em z app.products.tsx.
 // Oczekiwane kolumny (nagłówek, dowolna kolejność, PL/EN aliasy):
 //   product_id | id       — numeryczne ID produktu Shopify (wymagane)
 //   size | rozmiar        — etykieta rozmiaru (wymagane)
@@ -57,7 +57,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (!planCaps(settings.plan).bulkImport) {
     return Response.json(
-      { error: t("gate.locked_from", { plan: "Pro" }) },
+      { error: t("gate.locked_from", { plan: PLAN.STARTER }) },
       { status: 403 },
     );
   }

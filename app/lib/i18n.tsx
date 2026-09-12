@@ -159,7 +159,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "analytics.revenue.empty":
       "Brak jeszcze zamówień przypisanych do rekomendacji w tym okresie.",
     "analytics.locked.body":
-      "Ścieżka konwersji, zakupy z rekomendacji i szacunek zwrotów są dostępne od planu Growth. Statystyki użycia widzisz poniżej.",
+      "Ścieżka konwersji, zakupy z rekomendacji i szacunek zwrotów są dostępne od planu Starter. Statystyki użycia widzisz poniżej.",
 
     "plans.title": "Plan i limity",
     "plans.subtitle": "Wybierz miesięczny limit rekomendacji AI dla swojego sklepu",
@@ -219,10 +219,10 @@ const messages: Record<Locale, Record<string, string>> = {
     "gate.products_title": "Konfiguracja per-produkt",
     "gate.products_limit_reached":
       "Osiągnięto limit {n} produktów w planie {plan}. Zmień plan, aby dodać więcej.",
-    "gate.image_locked": "Zdjęcie rozmiarówki czytane przez AI jest dostępne od planu Growth.",
+    "gate.image_locked": "Zdjęcie rozmiarówki czytane przez AI jest dostępne od planu Starter.",
     "gate.analytics_title": "Analityka konwersji",
     "gate.tester_locked": "Tester promptu jest dostępny od planu Starter.",
-    "gate.csv_locked": "Eksport CSV jest dostępny w planie Pro.",
+    "gate.csv_locked": "Eksport CSV jest dostępny od planu Starter.",
 
     "index.subtitle": "Inteligentny asystent doboru rozmiaru na kartach produktów",
     "setup.title": "Zacznij tutaj",
@@ -610,7 +610,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "analytics.revenue.empty":
       "No orders attributed to recommendations in this range yet.",
     "analytics.locked.body":
-      "The conversion funnel, purchases from recommendations and the returns estimate are available on the Growth plan. Usage stats are shown below.",
+      "The conversion funnel, purchases from recommendations and the returns estimate are available on the Starter plan. Usage stats are shown below.",
 
     "plans.title": "Plan & limits",
     "plans.subtitle": "Choose the monthly AI recommendation limit for your store",
@@ -670,10 +670,10 @@ const messages: Record<Locale, Record<string, string>> = {
     "gate.products_title": "Per-product configuration",
     "gate.products_limit_reached":
       "Reached the {n}-product limit on the {plan} plan. Upgrade to add more.",
-    "gate.image_locked": "Size-chart image read by the AI is available on the Growth plan.",
+    "gate.image_locked": "Size-chart image read by the AI is available on the Starter plan.",
     "gate.analytics_title": "Conversion analytics",
     "gate.tester_locked": "The prompt tester is available on the Starter plan.",
-    "gate.csv_locked": "CSV export is available on the Pro plan.",
+    "gate.csv_locked": "CSV export is available on the Starter plan.",
 
     "index.subtitle": "Smart size recommendation assistant on product pages",
     "setup.title": "Get started",

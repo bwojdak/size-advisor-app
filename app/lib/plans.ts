@@ -68,11 +68,38 @@ export type PlanCapabilities = {
   autoSize: boolean;
 };
 
+// Płatne plany różnią się TYLKO wolumenem (monthlyLimit, patrz cena w
+// PLAN_PRICE) — wszystkie funkcje są identyczne na Starterze, Growth i Pro.
+// Decyzja świadoma: mniej "który plan ma X" (mniej miejsc na błędy
+// bramkowania — patrz commit 1ad9c17, gdzie dwie takie niespójności
+// znalazły się same), cena wprost odzwierciedla koszt AI (skaluje się z
+// wolumenem, nie z tym, czy ktoś używa custom CSS). Free zostaje jako
+// świadomie ograniczony driver instalacji w App Store (i tak nie płaci, ale
+// generuje instalacje/recenzje) — ma odblokowane tyle produktów, żeby
+// zweryfikować REALNĄ jakość na 1-2 produktach przed zakupem, a nie kupować
+// w ciemno.
+const PAID_TIER_CAPS: Omit<PlanCapabilities, "monthlyLimit"> = {
+  addToCartButton: true,
+  productRuleLimit: UNLIMITED,
+  sizeChartImageAI: true,
+  multilingual: true,
+  conversionAnalytics: true,
+  historyDays: 365,
+  csvExport: true,
+  removeBranding: true,
+  promptTester: true,
+  fitPreference: true,
+  customCss: true,
+  bulkImport: true,
+  garmentMatch: true,
+  autoSize: true,
+};
+
 export const PLAN_CAPS: Record<string, PlanCapabilities> = {
   [PLAN.FREE]: {
     monthlyLimit: 150,
     addToCartButton: false,
-    productRuleLimit: 0,
+    productRuleLimit: 2,
     sizeChartImageAI: false,
     multilingual: true, // widżet + odpowiedź AI po PL/EN, przełącznik dla klienta — na każdym planie
     conversionAnalytics: false,
@@ -86,57 +113,9 @@ export const PLAN_CAPS: Record<string, PlanCapabilities> = {
     garmentMatch: false,
     autoSize: false,
   },
-  [PLAN.STARTER]: {
-    monthlyLimit: 500,
-    addToCartButton: true,
-    productRuleLimit: 10,
-    sizeChartImageAI: false,
-    multilingual: true,
-    conversionAnalytics: false,
-    historyDays: 30,
-    csvExport: false,
-    removeBranding: false,
-    promptTester: true,
-    fitPreference: false,
-    customCss: false,
-    bulkImport: false,
-    garmentMatch: false,
-    autoSize: false,
-  },
-  [PLAN.GROWTH]: {
-    monthlyLimit: 3000,
-    addToCartButton: true,
-    productRuleLimit: UNLIMITED,
-    sizeChartImageAI: true,
-    multilingual: true,
-    conversionAnalytics: true,
-    historyDays: 365,
-    csvExport: false,
-    removeBranding: true,
-    promptTester: true,
-    fitPreference: true,
-    customCss: true,
-    bulkImport: false,
-    garmentMatch: true,
-    autoSize: true,
-  },
-  [PLAN.PRO]: {
-    monthlyLimit: 15000,
-    addToCartButton: true,
-    productRuleLimit: UNLIMITED,
-    sizeChartImageAI: true,
-    multilingual: true,
-    conversionAnalytics: true,
-    historyDays: 365,
-    csvExport: true,
-    removeBranding: true,
-    promptTester: true,
-    fitPreference: true,
-    customCss: true,
-    bulkImport: true,
-    garmentMatch: true,
-    autoSize: true,
-  },
+  [PLAN.STARTER]: { monthlyLimit: 500, ...PAID_TIER_CAPS },
+  [PLAN.GROWTH]: { monthlyLimit: 3000, ...PAID_TIER_CAPS },
+  [PLAN.PRO]: { monthlyLimit: 15000, ...PAID_TIER_CAPS },
 };
 
 /** Miesięczny limit rekomendacji na plan (skrót — źródłem prawdy jest PLAN_CAPS). */
@@ -150,11 +129,18 @@ export function planCaps(plan: string | null | undefined): PlanCapabilities {
 
 /**
  * Klucze i18n z listą wyróżników do wyświetlenia na kartach planów.
- * Płatne plany renderujemy jako „wszystko z {niższy}, plus:".
+ * Płatne plany renderujemy jako „wszystko z {niższy}, plus:" — a skoro
+ * Starter/Growth/Pro mają teraz IDENTYCZNE funkcje (patrz PAID_TIER_CAPS),
+ * Growth i Pro nie dodają nic poza wyższym miesięcznym limitem: cała ich
+ * lista to właśnie ten jeden wiersz. "Priority support" na Pro to jedyny
+ * wyjątek — to obietnica procesu wsparcia, nie flaga w kodzie, więc nie
+ * musi (i nie powinna) mieć odpowiednika w PlanCapabilities.
  */
 export const PLAN_FEATURES: Record<string, string[]> = {
   [PLAN.FREE]: [
     "plans.feat.rec",
+    "plans.feat.products_limited",
+    "plans.feat.extraction_review",
     "plans.feat.brand_style",
     "plans.feat.explanation",
     "plans.feat.theme_customize",
@@ -163,13 +149,6 @@ export const PLAN_FEATURES: Record<string, string[]> = {
   [PLAN.STARTER]: [
     "plans.feat.rec",
     "plans.feat.add_to_cart",
-    "plans.feat.products_limited",
-    "plans.feat.extraction_review",
-    "plans.feat.tester",
-    "plans.feat.history_days",
-  ],
-  [PLAN.GROWTH]: [
-    "plans.feat.rec",
     "plans.feat.products_unlimited",
     "plans.feat.size_image",
     "plans.feat.analytics",
@@ -180,11 +159,10 @@ export const PLAN_FEATURES: Record<string, string[]> = {
     "plans.feat.custom_css",
     "plans.feat.no_branding",
     "plans.feat.history_year",
-  ],
-  [PLAN.PRO]: [
-    "plans.feat.rec",
     "plans.feat.bulk_import",
     "plans.feat.csv",
-    "plans.feat.priority_support",
+    "plans.feat.tester",
   ],
+  [PLAN.GROWTH]: ["plans.feat.rec"],
+  [PLAN.PRO]: ["plans.feat.rec", "plans.feat.priority_support"],
 };

@@ -2,7 +2,7 @@ import { type ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { loadShopSettings } from "../lib/shop-settings.server";
-import { planCaps } from "../lib/plans";
+import { PLAN, planCaps } from "../lib/plans";
 import { requestT } from "../lib/i18n";
 
 // Zapis ustawień widżetu sterowanych z panelu (na razie: pytanie o preferencję
@@ -33,7 +33,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (typeof body.askFitPreference === "boolean") {
     if (body.askFitPreference && !caps.fitPreference) {
       return Response.json(
-        { error: t("gate.locked_from", { plan: "Growth" }) },
+        { error: t("gate.locked_from", { plan: PLAN.STARTER }) },
         { status: 403 },
       );
     }
@@ -43,7 +43,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (typeof body.askGarmentMatch === "boolean") {
     if (body.askGarmentMatch && !caps.garmentMatch) {
       return Response.json(
-        { error: t("gate.locked_from", { plan: "Growth" }) },
+        { error: t("gate.locked_from", { plan: PLAN.STARTER }) },
         { status: 403 },
       );
     }
@@ -61,7 +61,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (typeof body.widgetCustomCss === "string") {
     if (!caps.customCss) {
       return Response.json(
-        { error: t("gate.locked_from", { plan: "Growth" }) },
+        { error: t("gate.locked_from", { plan: PLAN.STARTER }) },
         { status: 403 },
       );
     }
@@ -81,7 +81,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (body.baselineReturnRate !== undefined) {
     if (!caps.conversionAnalytics) {
       return Response.json(
-        { error: t("gate.locked_from", { plan: "Growth" }) },
+        { error: t("gate.locked_from", { plan: PLAN.STARTER }) },
         { status: 403 },
       );
     }

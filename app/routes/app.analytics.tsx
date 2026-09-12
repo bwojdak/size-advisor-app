@@ -526,7 +526,7 @@ export default function AnalyticsPage() {
                       })}
                     />
                   ) : (
-                    <LockedFeature note={t("gate.locked_from", { plan: "Growth" })}>
+                    <LockedFeature note={t("gate.locked_from", { plan: PLAN.STARTER })}>
                       <Stat label={t("analytics.funnel.cart")} value="—" />
                     </LockedFeature>
                   )}

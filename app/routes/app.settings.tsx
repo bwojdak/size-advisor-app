@@ -19,7 +19,7 @@ import {
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { loadShopSettings } from "../lib/shop-settings.server";
-import { planCaps } from "../lib/plans";
+import { PLAN, planCaps } from "../lib/plans";
 import { useI18n, type Locale } from "../lib/i18n";
 import { LockedFeature } from "../components/LockedFeature";
 
@@ -534,7 +534,7 @@ export default function SettingsPage() {
                     </Collapsible>
                   </>
                 ) : (
-                  <LockedFeature note={t("gate.locked_from", { plan: "Growth" })}>
+                  <LockedFeature note={t("gate.locked_from", { plan: PLAN.STARTER })}>
                     <TextField
                       label={t("settings.css.title")}
                       labelHidden
@@ -572,7 +572,7 @@ export default function SettingsPage() {
                     ) : null}
                   </>
                 ) : (
-                  <LockedFeature note={t("gate.locked_from", { plan: "Growth" })}>
+                  <LockedFeature note={t("gate.locked_from", { plan: PLAN.STARTER })}>
                     <Checkbox
                       label={t("settings.fitPref.toggle")}
                       checked={false}
@@ -606,7 +606,7 @@ export default function SettingsPage() {
                     ) : null}
                   </>
                 ) : (
-                  <LockedFeature note={t("gate.locked_from", { plan: "Growth" })}>
+                  <LockedFeature note={t("gate.locked_from", { plan: PLAN.STARTER })}>
                     <Checkbox
                       label={t("settings.garment.toggle")}
                       checked={false}
@@ -656,7 +656,7 @@ export default function SettingsPage() {
                     ) : null}
                   </>
                 ) : (
-                  <LockedFeature note={t("gate.locked_from", { plan: "Growth" })}>
+                  <LockedFeature note={t("gate.locked_from", { plan: PLAN.STARTER })}>
                     <TextField
                       label={t("settings.returnRate.label")}
                       type="number"

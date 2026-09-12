@@ -226,7 +226,7 @@ export default function ProductsConfig() {
 
   const onImportClick = () => {
     if (!bulkImport) {
-      toast(t("gate.locked_from", { plan: "Pro" }), true);
+      toast(t("gate.locked_from", { plan: PLAN.STARTER }), true);
       return;
     }
     fileInputRef.current?.click();
@@ -234,7 +234,7 @@ export default function ProductsConfig() {
 
   const onTemplateClick = async () => {
     if (!bulkImport) {
-      toast(t("gate.locked_from", { plan: "Pro" }), true);
+      toast(t("gate.locked_from", { plan: PLAN.STARTER }), true);
       return;
     }
     setTemplateBusy(true);
