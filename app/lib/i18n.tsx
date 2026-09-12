@@ -365,7 +365,7 @@ const messages: Record<Locale, Record<string, string>> = {
 
     "settings.title": "Ustawienia zaawansowane",
     "settings.subtitle": "Sterowanie tym, jak AI dobiera rozmiary w całym sklepie",
-    "settings.brand.title": "Styl marki dla AI",
+    "settings.brand.title": "Styl marki dla AI (opcjonalne)",
     "settings.brand.desc":
       "Opisz jednym–dwoma zdaniami, jak generalnie krojone są Wasze produkty. AI weźmie to pod uwagę przy każdej rekomendacji w sklepie (o ile produkt nie ma własnej konfiguracji).",
     "settings.brand.label": "Styl marki",
@@ -810,7 +810,7 @@ const messages: Record<Locale, Record<string, string>> = {
 
     "settings.title": "Advanced settings",
     "settings.subtitle": "Control how the AI picks sizes across the whole store",
-    "settings.brand.title": "Brand fit for the AI",
+    "settings.brand.title": "Brand fit for the AI (optional)",
     "settings.brand.desc":
       "Describe in one or two sentences how your products are generally cut. The AI takes this into account on every recommendation in the store (unless the product has its own configuration).",
     "settings.brand.label": "Brand fit",
