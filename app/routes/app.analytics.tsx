@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { Link, useLoaderData } from "react-router";
 import {
   Badge,
   Banner,
@@ -537,10 +537,7 @@ export default function AnalyticsPage() {
             </Card>
 
             {conv ? (
-              <InlineGrid
-                columns={{ xs: 1, sm: 2, md: avoidedReturns != null ? 3 : 2 }}
-                gap="400"
-              >
+              <InlineGrid columns={{ xs: 1, sm: 2, md: 3 }} gap="400">
                 <Card>
                   <BlockStack gap="200">
                     <Text as="h2" variant="headingMd">
@@ -585,30 +582,43 @@ export default function AnalyticsPage() {
                         n: returned,
                         m: purchased,
                       })}
-                      {avoidedReturns == null
-                        ? t("analytics.returns.rate.hint")
-                        : ""}
                     </Text>
                   </BlockStack>
                 </Card>
-                {avoidedReturns != null ? (
-                  <Card>
-                    <BlockStack gap="200">
-                      <Text as="h2" variant="headingMd">
-                        {t("analytics.returns.avoided.title")}
+                <Card background={baselineReturnRate == null ? "bg-surface-secondary" : undefined}>
+                  <BlockStack gap="200">
+                    <Text
+                      as="h2"
+                      variant="headingMd"
+                      tone={baselineReturnRate == null ? "subdued" : undefined}
+                    >
+                      {t("analytics.returns.avoided.title")}
+                    </Text>
+                    <Text
+                      as="p"
+                      variant="heading2xl"
+                      fontWeight="bold"
+                      tone={baselineReturnRate == null ? "subdued" : undefined}
+                    >
+                      {baselineReturnRate == null ? "—" : `~${avoidedReturns ?? 0}`}
+                    </Text>
+                    {baselineReturnRate == null ? (
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        {t("analytics.returns.avoided.needsBaseline")}{" "}
+                        <Link to="/app/settings">
+                          {t("analytics.returns.avoided.needsBaselineLink")}
+                        </Link>
                       </Text>
-                      <Text as="p" variant="heading2xl" fontWeight="bold">
-                        {`~${avoidedReturns}`}
-                      </Text>
+                    ) : (
                       <Text as="p" variant="bodySm" tone="subdued">
                         {t("analytics.returns.avoided.body", {
                           widget: Math.round((widgetReturnRate ?? 0) * 100),
                           base: Math.round((baselineReturnRate ?? 0) * 100),
                         })}
                       </Text>
-                    </BlockStack>
-                  </Card>
-                ) : null}
+                    )}
+                  </BlockStack>
+                </Card>
               </InlineGrid>
             ) : null}
 
