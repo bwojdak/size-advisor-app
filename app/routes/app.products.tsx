@@ -90,6 +90,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             title
             status
             productType
+            category { name }
             featuredImage { url }
           }
         }
@@ -104,10 +105,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         title: node.title,
         image: node.featuredImage?.url ?? null,
         status: node.status ?? null,
-        // Kategoria bierzemy wprost z produktu w Shopify (to samo pole "Typ
-        // produktu" z klasycznego admina) — nie wymyślamy własnej taksonomii,
-        // filtr na liście po prostu odzwierciedla to, co sprzedawca już ma.
-        productType: node.productType?.trim() || null,
+        // Kategoria: wprost z produktu w Shopify, nie wymyślamy własnej
+        // taksonomii. "Typ produktu" (stare pole, klasyczny admin) bywa puste
+        // — wiele sklepów go nigdy nie uzupełniło — więc dokładamy nowszą,
+        // ustandaryzowaną kategorię (Standard Product Taxonomy) jako fallback,
+        // bo ta bywa uzupełniona nawet, gdy Typ produktu nie jest.
+        productType: node.productType?.trim() || node.category?.name || null,
       };
     }
   }
