@@ -137,10 +137,18 @@ export default function PlansPage() {
     100,
   );
 
+  // Starter/Growth/Pro mają identyczne funkcje (patrz PAID_TIER_CAPS w
+  // plans.ts) — różni je tylko wolumen. Zamiast powtarzać tę samą listę na
+  // trzech kartach, pokazujemy ją RAZ nad kartami, a na kartach zostaje
+  // tylko to, co faktycznie się różni (liczba rekomendacji). Lista bierze
+  // się z PLAN_FEATURES[Starter] (tam trzymana jest kompletna, bo to Starter
+  // pokazuje ją, gdy ktoś patrzy z osobna) minus wiersz z liczbą rekomendacji.
+  const paidSharedFeatures = PLAN_FEATURES[PLAN.STARTER].filter(
+    (key) => key !== "plans.feat.rec",
+  );
+
   const prevLabel: Record<string, string> = {
     [PLAN.STARTER]: "Free",
-    [PLAN.GROWTH]: PLAN.STARTER,
-    [PLAN.PRO]: PLAN.GROWTH,
   };
 
   const featText = (plan: string, key: string): string => {
@@ -240,6 +248,24 @@ export default function PlansPage() {
               </ButtonGroup>
             </InlineStack>
 
+            <Card>
+              <BlockStack gap="200">
+                <Text as="h3" variant="headingSm">
+                  {t("plans.paidShared.title")}
+                </Text>
+                <InlineGrid columns={{ xs: 1, sm: 2 }} gap="150">
+                  {paidSharedFeatures.map((key) => (
+                    <Text as="p" variant="bodySm" key={key}>
+                      ✓ {t(key)}
+                    </Text>
+                  ))}
+                </InlineGrid>
+                <Text as="p" variant="bodyXs" tone="subdued">
+                  {t("plans.paidShared.note")}
+                </Text>
+              </BlockStack>
+            </Card>
+
             <InlineGrid columns={{ xs: 1, sm: 2, md: 4 }} gap="400">
               {PLAN_ORDER.map((plan) => {
                 const isCurrent = plan === currentPlan;
@@ -287,21 +313,37 @@ export default function PlansPage() {
                       ) : null}
 
                       <BlockStack gap="150">
-                        {plan !== PLAN.FREE ? (
-                          <Text
-                            as="p"
-                            variant="bodyXs"
-                            tone="subdued"
-                            fontWeight="medium"
-                          >
-                            {t("plans.includes_prev", { plan: prevLabel[plan] })}
-                          </Text>
-                        ) : null}
-                        {PLAN_FEATURES[plan].map((key) => (
-                          <Text as="p" variant="bodySm" key={key}>
-                            ✓ {featText(plan, key)}
-                          </Text>
-                        ))}
+                        {plan === PLAN.FREE ? (
+                          PLAN_FEATURES[plan].map((key) => (
+                            <Text as="p" variant="bodySm" key={key}>
+                              ✓ {featText(plan, key)}
+                            </Text>
+                          ))
+                        ) : (
+                          <>
+                            {plan === PLAN.STARTER ? (
+                              <Text
+                                as="p"
+                                variant="bodyXs"
+                                tone="subdued"
+                                fontWeight="medium"
+                              >
+                                {t("plans.includes_prev", { plan: prevLabel[plan] })}
+                              </Text>
+                            ) : null}
+                            {/* Starter/Growth/Pro mają te same funkcje (patrz
+                                karta wyżej) — jedyna różnica to wolumen, więc
+                                to jedyne, co tu pokazujemy. */}
+                            <Text as="p" variant="bodyMd" fontWeight="semibold">
+                              ✓ {featText(plan, "plans.feat.rec")}
+                            </Text>
+                            {plan === PLAN.PRO ? (
+                              <Text as="p" variant="bodySm">
+                                ✓ {t("plans.feat.priority_support")}
+                              </Text>
+                            ) : null}
+                          </>
+                        )}
                       </BlockStack>
 
                       {isCurrent ? (

@@ -188,6 +188,9 @@ const messages: Record<Locale, Record<string, string>> = {
     "common.cancel": "Anuluj",
     "common.moreActions": "Więcej czynności",
     "plans.includes_prev": "Wszystko z planu {plan}, plus:",
+    "plans.paidShared.title": "Każdy płatny plan (Starter, Growth, Pro) zawiera:",
+    "plans.paidShared.note":
+      "Plany płatne różnią się WYŁĄCZNIE miesięcznym limitem rekomendacji — im wyższy plan, tym więcej rekomendacji, wszystkie funkcje takie same.",
     "plans.feat.rec": "{n} rekomendacji / mies.",
     "plans.feat.brand_style": "Styl marki dla AI",
     "plans.feat.explanation": "Wyjaśnienie „dlaczego ten rozmiar” dla klienta",
@@ -639,6 +642,9 @@ const messages: Record<Locale, Record<string, string>> = {
     "common.cancel": "Cancel",
     "common.moreActions": "More actions",
     "plans.includes_prev": "Everything in {plan}, plus:",
+    "plans.paidShared.title": "Every paid plan (Starter, Growth, Pro) includes:",
+    "plans.paidShared.note":
+      "Paid plans differ ONLY in their monthly recommendation limit — the higher the plan, the more recommendations, every feature is the same.",
     "plans.feat.rec": "{n} recommendations / mo",
     "plans.feat.brand_style": "Brand fit for the AI",
     "plans.feat.explanation": "“Why this size” explanation for the shopper",
