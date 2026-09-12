@@ -59,6 +59,34 @@ async function runExtraction(
   }
 
   const useImage = opts.sizeChartImageAI && Boolean(rule.sizeChartImage);
+  const structuredRows = parseStructuredRows(rule.structuredSizeData);
+
+  // Bez zdjęcia, notatek, opisu produktu ze Shopify I zweryfikowanej siatki —
+  // AI dostałoby do analizy tylko sam tytuł. Prompt mówi wtedy wprost
+  // "tabela": [] (brak danych, nie zgaduj) — ale model czasem i tak próbuje
+  // "coś" wymyślić zamiast tego zamiast pustej odpowiedzi (patrz 2d9ebda:
+  // te same jeansy dostały w ten sposób zmyśloną tabelę 6 rozmiarów z
+  // idealnymi skokami co 5cm). Skoro i tak nie mielibyśmy z czego czytać,
+  // w ogóle nie pytamy modelu — taniej i zero ryzyka fabrykacji z niczego.
+  const hasAnyInput =
+    useImage ||
+    Boolean(rule.customNotes?.trim()) ||
+    Boolean(productDescription?.trim()) ||
+    Boolean(structuredRows);
+  if (!hasAnyInput) {
+    await db.productRule.update({
+      where: { id: rule.id },
+      data: {
+        extractionJson: null,
+        extractionAt: null,
+        extractionModel: null,
+        extractionVersion: null,
+        extractionError: null,
+      },
+    });
+    return false;
+  }
+
   try {
     const { rawJson } = await extractProductChart(model, {
       productTitle: rule.productTitle || null,
@@ -72,10 +100,7 @@ async function runExtraction(
       // ("oceń PRZEDE WSZYSTKIM z wymiarów tabeli, nie z nazwy"), i zgadywałoby
       // wyłącznie z nazwy produktu. AI i tak nie decyduje o liczbach w tabeli
       // wynikowej — te bierze silnik z tej samej siatki (applyStructuredRows).
-      productSizeData: (() => {
-        const rows = parseStructuredRows(rule.structuredSizeData);
-        return rows ? structuredRowsAsPromptText(rows) : null;
-      })(),
+      productSizeData: structuredRows ? structuredRowsAsPromptText(structuredRows) : null,
       productNotes: rule.customNotes || null,
       sizeChartImage: useImage ? rule.sizeChartImage : null,
       hasSizeChartImage: useImage,

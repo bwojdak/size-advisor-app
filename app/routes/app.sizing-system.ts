@@ -41,6 +41,28 @@ async function runSystemExtraction(
   const useImage = opts.sizeChartImageAI && Boolean(system.sizeChartImage);
   if (!apiKey) return false;
 
+  const structuredRows = parseStructuredRows(system.structuredSizeData);
+  // Bez zdjęcia, notatek i zweryfikowanej siatki AI dostałoby do analizy
+  // tylko samą nazwę systemu — prompt każe wtedy zwrócić "tabela": [], ale
+  // model czasem próbuje "coś" wymyślić zamiast pustej odpowiedzi (patrz
+  // 2d9ebda i komentarz w app.product-rule.ts). Skoro nie ma z czego czytać,
+  // w ogóle nie pytamy modelu.
+  const hasAnyInput =
+    useImage || Boolean(system.customNotes?.trim()) || Boolean(structuredRows);
+  if (!hasAnyInput) {
+    await db.sizingSystem.update({
+      where: { id: system.id },
+      data: {
+        extractionJson: null,
+        extractionAt: null,
+        extractionModel: null,
+        extractionVersion: null,
+        extractionError: null,
+      },
+    });
+    return false;
+  }
+
   try {
     const { rawJson } = await extractProductChart(model, {
       productTitle: system.name || null,
@@ -51,10 +73,7 @@ async function runSystemExtraction(
       // tego, gdy jest zweryfikowana siatka, podajemy JĄ jako tabelę — inaczej
       // (bez zdjęcia) AI nie miałoby żadnych liczb do oceny "krojLuz" i
       // zgadywałoby wyłącznie z nazwy systemu.
-      productSizeData: (() => {
-        const rows = parseStructuredRows(system.structuredSizeData);
-        return rows ? structuredRowsAsPromptText(rows) : null;
-      })(),
+      productSizeData: structuredRows ? structuredRowsAsPromptText(structuredRows) : null,
       productNotes: system.customNotes || null,
       sizeChartImage: useImage ? system.sizeChartImage : null,
       hasSizeChartImage: useImage,
