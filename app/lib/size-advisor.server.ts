@@ -77,8 +77,6 @@ export type ChartExtraction = {
   /** „Model ma 184 cm i nosi rozmiar L" – wzorzec marki, jeśli podany w opisie. */
   modelHeight: number | null;
   modelSize: string | null;
-  /** Rozmiar z tej tabeli równoważny podanemu ubraniu referencyjnemu klienta. */
-  refEquivalentSize: string | null;
   /** Zapasowy typ, gdy nie ma żadnej tabeli – wtedy model zgaduje sam. */
   fallbackSize: string | null;
   fallbackExplanation: string | null;
@@ -1547,10 +1545,6 @@ function parseExtraction(json: Record<string, unknown>): ChartExtraction {
     outerwear: bool(json.odziezWierzchnia ?? json.outerwear, false),
     modelHeight: num(json.modelWzrost ?? json.modelHeight),
     modelSize: mSize,
-    refEquivalentSize:
-      typeof json.refRozmiarWTabeli === "string" && json.refRozmiarWTabeli.trim()
-        ? json.refRozmiarWTabeli.trim()
-        : null,
     fallbackSize:
       typeof json.zapasowyRozmiar === "string" && json.zapasowyRozmiar.trim()
         ? json.zapasowyRozmiar.trim()

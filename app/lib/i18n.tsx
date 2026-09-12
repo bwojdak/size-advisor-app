@@ -210,7 +210,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "plans.feat.custom_css": "Własny CSS widżetu",
     "plans.feat.bulk_import": "Masowy import rozmiarówek z CSV",
     "plans.feat.fit_pref": "Pytanie o preferencję dopasowania w widżecie",
-    "plans.feat.garment_match": "Dopasowanie po ubraniu klienta („mam dobrze leżące X marki Y”)",
+    "plans.feat.garment_match": "Dopasowanie po pomiarach ubrania klienta, które dobrze leży",
     "plans.feat.auto_size": "„Mój rozmiar: X” — kupujący podaje wymiary raz, widzi rozmiar na każdym produkcie",
 
     "gate.see_plans": "Zobacz plany",
@@ -661,7 +661,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "plans.feat.custom_css": "Custom widget CSS",
     "plans.feat.bulk_import": "Bulk size-chart import (CSV)",
     "plans.feat.fit_pref": "Fit-preference question in the widget",
-    "plans.feat.garment_match": "Match by a garment the shopper owns (“I have a well-fitting X by Y”)",
+    "plans.feat.garment_match": "Matches from the measurements of a garment the shopper says fits well",
     "plans.feat.auto_size": "“My size: X” — shopper enters measurements once, sees their size on every product",
 
     "gate.see_plans": "See plans",

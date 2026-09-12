@@ -16,7 +16,7 @@ import {
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { loadShopSettings } from "../lib/shop-settings.server";
-import { planCaps } from "../lib/plans";
+import { PLAN, planCaps } from "../lib/plans";
 import { useI18n } from "../lib/i18n";
 import { LockedFeature } from "../components/LockedFeature";
 
@@ -28,7 +28,39 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const settings = await loadShopSettings(session.shop);
   const caps = planCaps(settings.plan);
 
-  const windowDays = caps.historyDays > 0 ? caps.historyDays : 400;
+  // historyDays: 0 (Free) znaczyło do tej pory "okno 400 dni" tutaj — sprzeczne
+  // z własnym kontraktem tego pola ("0 = tylko 5 ostatnich", patrz PlanCapabilities
+  // w lib/plans.ts) i z tym, jak historyDays===0 jest poprawnie obsłużone na
+  // stronie głównej. Efekt: Free widział WIĘCEJ historii w pełnej Analityce niż
+  // płatny Starter (30 dni). Cała ta strona to realny, płatny benefit od
+  // Startera wzwyż — Free dostaje tylko zapowiedź (5 ostatnich) na stronie głównej.
+  // Zwracamy ten sam kształt co normalna ścieżka (same puste/zerowe wartości),
+  // żeby komponent nie musiał osobno typować dwóch różnych kształtów danych —
+  // tylko `locked: true` decyduje, co się renderuje.
+  if (caps.historyDays === 0) {
+    return {
+      locked: true,
+      conv: false,
+      csvExport: false,
+      windowDays: 0,
+      total: 0,
+      addedToCart: 0,
+      purchased: 0,
+      returned: 0,
+      widgetReturnRate: null,
+      baselineReturnRate: null,
+      avoidedReturns: null,
+      revenue: [] as { currency: string; amount: number }[],
+      perDay: [] as { date: string; value: number }[],
+      sizeAgg: [] as { product: string; size: string; count: number }[],
+      gender: [] as { key: string; value: number }[],
+      body: [] as { key: string; value: number }[],
+      topProducts: [] as { title: string; n: number; added: number; purchased: number }[],
+      recentPurchases: [] as { date: string; title: string; size: string }[],
+    };
+  }
+
+  const windowDays = caps.historyDays;
   const since = new Date();
   since.setDate(since.getDate() - windowDays);
 
@@ -176,9 +208,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }));
 
   return {
+    locked: false,
     conv: caps.conversionAnalytics,
     csvExport: caps.csvExport,
-    windowDays: caps.historyDays > 0 ? caps.historyDays : null,
+    windowDays: caps.historyDays,
     total,
     addedToCart,
     purchased,
@@ -346,6 +379,7 @@ export default function AnalyticsPage() {
   const data = useLoaderData<typeof loader>();
   const { t } = useI18n();
   const {
+    locked,
     conv,
     csvExport,
     windowDays,
@@ -443,21 +477,13 @@ export default function AnalyticsPage() {
     .map((b) => ({ label: bodyLabel(b.key), value: b.value }))
     .sort((a, b) => b.value - a.value);
 
-  return (
-    <Page
-      title={t("analytics.title")}
-      subtitle={t("analytics.subtitle")}
-      primaryAction={
-        csvExport
-          ? {
-              content: t("analytics.csv"),
-              onAction: downloadCsv,
-              loading: downloading,
-            }
-          : undefined
-      }
-    >
-      <BlockStack gap="500">
+  // Free (locked) dostaje wyszarzoną, nieaktywną wersję całej strony zamiast
+  // (jak wcześniej) w pełni sprawnego dashboardu liczonego z 400 dni danych —
+  // patrz komentarz w loaderze. Zawartość budujemy raz, żeby nie duplikować
+  // tej ogromnej struktury JSX w obu gałęziach (nazwa inna niż `body` — to
+  // już zajęte przez rozkład budowy ciała klientów, patrz destrukturyzacja).
+  const pageContent = (
+    <BlockStack gap="500">
         {csvError ? (
           <Banner tone="critical" onDismiss={() => setCsvError(null)}>
             {csvError}
@@ -776,6 +802,29 @@ export default function AnalyticsPage() {
           </>
         )}
       </BlockStack>
+  );
+
+  return (
+    <Page
+      title={t("analytics.title")}
+      subtitle={t("analytics.subtitle")}
+      primaryAction={
+        csvExport
+          ? {
+              content: t("analytics.csv"),
+              onAction: downloadCsv,
+              loading: downloading,
+            }
+          : undefined
+      }
+    >
+      {locked ? (
+        <LockedFeature note={t("gate.locked_from", { plan: PLAN.STARTER })}>
+          {pageContent}
+        </LockedFeature>
+      ) : (
+        pageContent
+      )}
     </Page>
   );
 }
