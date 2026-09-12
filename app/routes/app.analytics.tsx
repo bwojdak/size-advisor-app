@@ -486,7 +486,11 @@ export default function AnalyticsPage() {
                   {t("analytics.funnel.title")}
                 </Text>
                 <InlineGrid columns={{ xs: 1, sm: 3 }} gap="400">
-                  <Stat label={t("analytics.funnel.recs")} value={total} />
+                  <Stat
+                    label={t("analytics.funnel.recs")}
+                    value={total}
+                    sub={t("analytics.funnel.recsNote")}
+                  />
                   {conv ? (
                     <Stat
                       label={t("analytics.funnel.cart")}

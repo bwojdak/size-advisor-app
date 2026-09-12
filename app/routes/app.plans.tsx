@@ -217,6 +217,9 @@ export default function PlansPage() {
                   size="small"
                   tone={usagePercent > 85 ? "critical" : "primary"}
                 />
+                <Text as="p" variant="bodyXs" tone="subdued">
+                  {t("plans.usage.cacheNote")}
+                </Text>
               </BlockStack>
             </Card>
 

@@ -122,6 +122,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "analytics.empty": "Brak danych w tym zakresie.",
     "analytics.funnel.title": "Od rekomendacji do zakupu",
     "analytics.funnel.recs": "Rekomendacje",
+    "analytics.funnel.recsNote": "łącznie z trafieniami w cache (nie zużywają limitu z planu)",
     "analytics.funnel.cart": "Dodano rozmiar do koszyka",
     "analytics.funnel.bought": "Kupiono",
     "analytics.funnel.note":
@@ -162,6 +163,8 @@ const messages: Record<Locale, Record<string, string>> = {
     "plans.title": "Plan i limity",
     "plans.subtitle": "Wybierz miesięczny limit rekomendacji AI dla swojego sklepu",
     "plans.usage": "Wykorzystano {used} z {limit} rekomendacji w tym miesiącu",
+    "plans.usage.cacheNote":
+      "Nie liczy trafień w cache (np. „Mój rozmiar” na kolejnym produkcie dla tej samej sylwetki) — te są darmowe i nie zużywają limitu. Dlatego liczba rekomendacji w Analityce bywa wyższa niż tutaj.",
     "plans.current": "Obecny plan",
     "plans.recommendations": "{n} rekomendacji / mies.",
     "plans.free_price": "Za darmo",
@@ -567,6 +570,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "analytics.empty": "No data in this range yet.",
     "analytics.funnel.title": "From recommendation to purchase",
     "analytics.funnel.recs": "Recommendations",
+    "analytics.funnel.recsNote": "includes cache hits (don't use up the plan's limit)",
     "analytics.funnel.cart": "Added size to cart",
     "analytics.funnel.bought": "Purchased",
     "analytics.funnel.note":
@@ -607,6 +611,8 @@ const messages: Record<Locale, Record<string, string>> = {
     "plans.title": "Plan & limits",
     "plans.subtitle": "Choose the monthly AI recommendation limit for your store",
     "plans.usage": "Used {used} of {limit} recommendations this month",
+    "plans.usage.cacheNote":
+      "Doesn't count cache hits (e.g. “My size” on another product for the same body) — those are free and don't use up the limit. That's why the recommendation count in Analytics can be higher than here.",
     "plans.current": "Current plan",
     "plans.recommendations": "{n} recommendations / mo",
     "plans.free_price": "Free",
