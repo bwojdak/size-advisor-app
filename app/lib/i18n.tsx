@@ -193,7 +193,6 @@ const messages: Record<Locale, Record<string, string>> = {
       "Plany płatne różnią się WYŁĄCZNIE miesięcznym limitem rekomendacji — im wyższy plan, tym więcej rekomendacji, wszystkie funkcje takie same.",
     "plans.feat.rec": "{n} rekomendacji / mies.",
     "plans.feat.brand_style": "Styl marki dla AI",
-    "plans.feat.explanation": "Wyjaśnienie „dlaczego ten rozmiar” dla klienta",
     "plans.feat.theme_customize": "Teksty i wygląd widżetu w edytorze motywu",
     "plans.feat.history_recent": "5 ostatnich zapytań",
     "plans.feat.extraction_review":
@@ -647,7 +646,6 @@ const messages: Record<Locale, Record<string, string>> = {
       "Paid plans differ ONLY in their monthly recommendation limit — the higher the plan, the more recommendations, every feature is the same.",
     "plans.feat.rec": "{n} recommendations / mo",
     "plans.feat.brand_style": "Brand fit for the AI",
-    "plans.feat.explanation": "“Why this size” explanation for the shopper",
     "plans.feat.theme_customize": "Widget text & styling in the theme editor",
     "plans.feat.history_recent": "Last 5 queries",
     "plans.feat.extraction_review":

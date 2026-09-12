@@ -142,7 +142,6 @@ export const PLAN_FEATURES: Record<string, string[]> = {
     "plans.feat.products_limited",
     "plans.feat.extraction_review",
     "plans.feat.brand_style",
-    "plans.feat.explanation",
     "plans.feat.theme_customize",
     "plans.feat.history_recent",
   ],
