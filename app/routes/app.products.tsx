@@ -963,7 +963,14 @@ export default function ProductsConfig() {
 
             {currentSystemId ? (
               <Text as="p" tone="subdued" variant="bodySm">
-                {t("sizingSystems.chartHelp")}
+                {t("products.mappedSystem.editHint", {
+                  name:
+                    sizingSystems.find((s) => s.id === currentSystemId)?.name ??
+                    "",
+                })}{" "}
+                <Link to="/app/sizing-systems">
+                  {t("products.mappedSystem.editLink")}
+                </Link>
               </Text>
             ) : (
             <>

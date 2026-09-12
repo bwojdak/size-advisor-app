@@ -59,11 +59,9 @@ const messages: Record<Locale, Record<string, string>> = {
       "Usunąć system „{name}”? Odepnie się od {n} produktów (wrócą do własnej konfiguracji).",
     "sizingSystems.nameLabel": "Nazwa systemu",
     "sizingSystems.namePlaceholder": "np. Standardowe t-shirty",
-    "sizingSystems.chartLabel": "Opis dla AI (opcjonalnie)",
-    "sizingSystems.chartPlaceholder":
-      "Rozmiar S: klatka 114, długość 68\nRozmiar M: klatka 120, długość 70\n...",
-    "sizingSystems.chartHelp":
-      "Liczby bierzemy z siatki powyżej — to pole służy tylko do rozpoznania kroju, materiału i kategorii przez AI. Możesz wkleić oryginalną tabelę sprzedawcy jako podpowiedź albo zostawić puste.",
+    "products.mappedSystem.editHint":
+      "Ten produkt korzysta z tabeli wymiarów systemu „{name}” — tabelę, notatki i zdjęcie edytuje się tam, nie tutaj.",
+    "products.mappedSystem.editLink": "Przejdź do Systemów rozmiarów",
     "grid.title": "Zweryfikowana tabela rozmiarów",
     "grid.help":
       "Wpisz dokładne wymiary per rozmiar — to nadpisuje odczyt AI i eliminuje pomyłki w tabeli (np. pomylony obwód z połową obwodu). Klatkę/pas/biodra możesz podać na płasko (pacha–pacha, tak jak zwykle jest na metce) albo jako pełny obwód — rozpoznamy automatycznie po wielkości liczb, nie musisz przeliczać. Kolumny to zamknięta lista standardowych punktów pomiarowych branży odzieżowej — dodawaj/usuwaj wg produktu. Zostaw puste pole, jeśli wymiar nie dotyczy.",
@@ -86,7 +84,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "grid.prefillFromAi": "Wypełnij z ostatniej analizy AI",
     "grid.verifyToast":
       "Wypełniono danymi z analizy AI — sprawdź liczby przed zapisem, AI mogło się pomylić.",
-    "grid.verifiedBadge": "Zweryfikowana siatka",
+    "grid.verifiedBadge": "Zweryfikowana tabela rozmiarów",
     "consistency.title": "Test spójności tabeli",
     "consistency.checking": "Sprawdzanie na sylwetkach testowych…",
     "consistency.ok": "Spójna na {n} przetestowanych sylwetkach.",
@@ -507,11 +505,9 @@ const messages: Record<Locale, Record<string, string>> = {
       "Delete the \"{name}\" system? It will detach from {n} products (they go back to their own config).",
     "sizingSystems.nameLabel": "System name",
     "sizingSystems.namePlaceholder": "e.g. Standard t-shirts",
-    "sizingSystems.chartLabel": "Description for the AI (optional)",
-    "sizingSystems.chartPlaceholder":
-      "Size S: chest 114, length 68\nSize M: chest 120, length 70\n...",
-    "sizingSystems.chartHelp":
-      "Numbers come from the grid above — this field is only used to help the AI recognise the cut, material and category. Paste the original chart as a hint, or leave it blank.",
+    "products.mappedSystem.editHint":
+      "This product uses the “{name}” sizing system's table — edit the table, notes, and image there, not here.",
+    "products.mappedSystem.editLink": "Go to Sizing systems",
     "grid.title": "Verified size table",
     "grid.help":
       "Type exact measurements per size — this overrides the AI's reading of the chart and removes parsing mistakes (e.g. a full measurement mistaken for a half one). Chest/waist/hip can be given laid flat (armpit-to-armpit, the way it's usually printed on the tag) or as a full circumference — we detect which one automatically from the size of the numbers, no need to convert. The columns are a closed list of standard apparel-industry measurement points — add/remove per product. Leave a field blank where it doesn't apply.",
@@ -534,7 +530,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "grid.prefillFromAi": "Fill from the latest AI analysis",
     "grid.verifyToast":
       "Filled from the AI analysis — check the numbers before saving, the AI may have gotten something wrong.",
-    "grid.verifiedBadge": "Verified grid",
+    "grid.verifiedBadge": "Verified size table",
     "consistency.title": "Table consistency check",
     "consistency.checking": "Checking against test body profiles…",
     "consistency.ok": "Consistent across {n} tested body profiles.",
