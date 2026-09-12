@@ -190,6 +190,16 @@ export function SizeGrid({
       rowsWithSize.filter((r) => !r[key].trim()).map((r) => r.size),
     [rowsWithSize],
   );
+  // Miękkie ostrzeżenie #3: kolumna wypełniona dla ≥3 rozmiarów, ale ta SAMA
+  // liczba dla każdego z nich. Realne tabele producentów praktycznie zawsze
+  // mają jakiś rozrzut — identyczna wartość na całej szerokości to zwykle
+  // znak, że AI zmyśliło "wiarygodnie wyglądającą" tabelę zamiast przyznać,
+  // że nie miało z czego jej odczytać (a to złamanie wprost instrukcji w
+  // prompcie), albo że coś zostało wklejone/skopiowane błędnie.
+  const flatCols = COLS.filter((c) => {
+    const vals = rowsWithSize.map((r) => r[c.key].trim()).filter(Boolean);
+    return vals.length >= 3 && new Set(vals).size === 1;
+  });
   const removeCol = useCallback(
     (key: keyof GridRow) => {
       setVisibleDims((v) => v.filter((k) => k !== key));
@@ -303,6 +313,13 @@ export function SizeGrid({
           })}
         </Text>
       ) : null}
+      {flatCols.length ? (
+        <Text as="p" variant="bodyXs" tone="caution">
+          {t("grid.flatCols", {
+            names: flatCols.map((c) => t(c.labelKey)).join(", "),
+          })}
+        </Text>
+      ) : null}
       {rows.length > 0 ? (
         <Box overflowX="scroll" paddingBlockEnd="100">
           <div
@@ -330,7 +347,9 @@ export function SizeGrid({
                   as="span"
                   variant="bodyXs"
                   tone={
-                    unusualCols.includes(c) || incompleteCols.includes(c)
+                    unusualCols.includes(c) ||
+                    incompleteCols.includes(c) ||
+                    flatCols.includes(c)
                       ? "caution"
                       : "subdued"
                   }
@@ -376,11 +395,13 @@ export function SizeGrid({
                   // od razu było widać, że to podpowiedź, nie dane.
                   const isEmptyFlagged =
                     !row[c.key].trim() && incompleteCols.includes(c);
+                  const isFlatFlagged =
+                    row[c.key].trim() && flatCols.includes(c);
                   return (
                     <div
                       key={c.key}
                       style={
-                        isEmptyFlagged
+                        isEmptyFlagged || isFlatFlagged
                           ? {
                               background:
                                 "var(--p-color-bg-caution-subdued, #fff4e4)",
