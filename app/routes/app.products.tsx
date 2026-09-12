@@ -71,7 +71,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const products: Record<
     string,
-    { title: string; image: string | null; status: string | null }
+    {
+      title: string;
+      image: string | null;
+      status: string | null;
+      productType: string | null;
+    }
   > = {};
 
   if (rules.length) {
@@ -84,6 +89,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             id
             title
             status
+            productType
             featuredImage { url }
           }
         }
@@ -98,6 +104,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         title: node.title,
         image: node.featuredImage?.url ?? null,
         status: node.status ?? null,
+        // Kategoria bierzemy wprost z produktu w Shopify (to samo pole "Typ
+        // produktu" z klasycznego admina) — nie wymyślamy własnej taksonomii,
+        // filtr na liście po prostu odzwierciedla to, co sprzedawca już ma.
+        productType: node.productType?.trim() || null,
       };
     }
   }
@@ -316,6 +326,7 @@ export default function ProductsConfig() {
   );
 
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const titleOf = useCallback(
     (r: (typeof rules)[number]) =>
       products[r.productId]?.title ||
@@ -323,14 +334,27 @@ export default function ProductsConfig() {
       t("products.item.fallback", { id: r.productId }),
     [products, t],
   );
+  // Kategoria to "Typ produktu" ze Shopify (to samo pole co w klasycznym
+  // adminie) — lista opcji to tylko te typy, które realnie występują wśród
+  // skonfigurowanych produktów, więc filtr nigdy nie jest pusty/nieaktualny.
+  const categoryOptions = useMemo(() => {
+    const types = new Set<string>();
+    for (const r of rules) {
+      const type = products[r.productId]?.productType;
+      if (type) types.add(type);
+    }
+    return Array.from(types).sort((a, b) => a.localeCompare(b));
+  }, [rules, products]);
   const filteredRules = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return rules;
-    return rules.filter(
-      (r) =>
-        titleOf(r).toLowerCase().includes(q) || r.productId.includes(q),
-    );
-  }, [rules, search, titleOf]);
+    return rules.filter((r) => {
+      const matchesQuery =
+        !q || titleOf(r).toLowerCase().includes(q) || r.productId.includes(q);
+      const matchesCategory =
+        !categoryFilter || products[r.productId]?.productType === categoryFilter;
+      return matchesQuery && matchesCategory;
+    });
+  }, [rules, search, categoryFilter, titleOf, products]);
 
   const openEditor = useCallback(
     (productId: string, title: string) => {
@@ -600,16 +624,34 @@ export default function ProductsConfig() {
             ) : (
               <>
                 <Box padding="300" borderBlockEndWidth="025" borderColor="border">
-                  <TextField
-                    label={t("products.search.label")}
-                    labelHidden
-                    placeholder={t("products.search.placeholder")}
-                    value={search}
-                    onChange={setSearch}
-                    autoComplete="off"
-                    clearButton
-                    onClearButtonClick={() => setSearch("")}
-                  />
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <div style={{ flex: 1 }}>
+                      <TextField
+                        label={t("products.search.label")}
+                        labelHidden
+                        placeholder={t("products.search.placeholder")}
+                        value={search}
+                        onChange={setSearch}
+                        autoComplete="off"
+                        clearButton
+                        onClearButtonClick={() => setSearch("")}
+                      />
+                    </div>
+                    {categoryOptions.length > 0 ? (
+                      <div style={{ minWidth: "200px" }}>
+                        <Select
+                          label={t("products.category.label")}
+                          labelHidden
+                          value={categoryFilter}
+                          onChange={setCategoryFilter}
+                          options={[
+                            { label: t("products.category.all"), value: "" },
+                            ...categoryOptions.map((c) => ({ label: c, value: c })),
+                          ]}
+                        />
+                      </div>
+                    ) : null}
+                  </InlineStack>
                 </Box>
                 {filteredRules.length === 0 ? (
                   <Box padding="500">

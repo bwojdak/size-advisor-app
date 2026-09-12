@@ -361,7 +361,9 @@ const messages: Record<Locale, Record<string, string>> = {
     "products.import.done": "Zaimportowano rozmiarówki dla {n} produktów",
     "products.search.label": "Szukaj produktu",
     "products.search.placeholder": "Szukaj po nazwie produktu…",
-    "products.search.none": "Brak produktów pasujących do wyszukiwania.",
+    "products.search.none": "Brak produktów pasujących do filtrów.",
+    "products.category.label": "Kategoria",
+    "products.category.all": "Wszystkie kategorie",
     "import.empty": "Pusty plik CSV.",
     "import.badHeader":
       "Nagłówek CSV musi zawierać kolumny „product_id” i „size” (lub „rozmiar”).",
@@ -810,7 +812,9 @@ const messages: Record<Locale, Record<string, string>> = {
     "products.import.done": "Imported size charts for {n} products",
     "products.search.label": "Search products",
     "products.search.placeholder": "Search by product name…",
-    "products.search.none": "No products match your search.",
+    "products.search.none": "No products match the filters.",
+    "products.category.label": "Category",
+    "products.category.all": "All categories",
     "import.empty": "Empty CSV file.",
     "import.badHeader":
       "The CSV header must include a “product_id” and a “size” column.",
