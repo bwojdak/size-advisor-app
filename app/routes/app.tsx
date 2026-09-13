@@ -1,7 +1,13 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Outlet, useLoaderData, useNavigation } from "react-router";
+import {
+  Outlet,
+  isRouteErrorResponse,
+  useLoaderData,
+  useNavigation,
+  useRouteError,
+} from "react-router";
 import { NavMenu } from "@shopify/app-bridge-react";
-import { AppProvider } from "@shopify/polaris";
+import { AppProvider, Banner, BlockStack, Button, Card, Page, Text } from "@shopify/polaris";
 import enTranslations from "@shopify/polaris/locales/en.json";
 import plTranslations from "@shopify/polaris/locales/pl.json";
 import { authenticate } from "../shopify.server";
@@ -88,3 +94,43 @@ export default function App() {
 export const headers: HeadersFunction = () => {
   return {};
 };
+
+// Bez tego nieobsłużony wyjątek w KTÓRYMKOLWIEK loaderze/akcji/renderze pod
+// /app/* (błąd bazy, awaria zewnętrznego API, bug w komponencie) pokazywał
+// gołą, niemarkową stronę błędu React Routera zamiast czegoś spójnego z
+// resztą panelu — zły wygląd akurat na etapie publikacji w App Store. Musi
+// działać SAMODZIELNIE (bez `useLoaderData` z tego route'a — loader mógł być
+// właśnie tym, co rzuciło wyjątek) i nie ujawniać surowego komunikatu błędu
+// merchantowi (może zawierać szczegóły wewnętrzne).
+export function ErrorBoundary() {
+  const error = useRouteError();
+  const status = isRouteErrorResponse(error) ? error.status : null;
+  if (process.env.NODE_ENV !== "production" || typeof window === "undefined") {
+    console.error("[app] ErrorBoundary caught:", error);
+  }
+
+  return (
+    <AppProvider i18n={enTranslations}>
+      <Page title="Size Advisor">
+        <Card>
+          <BlockStack gap="400">
+            <Banner tone="critical">
+              <Text as="p">
+                Coś poszło nie tak / Something went wrong
+                {status ? ` (${status})` : ""}.
+              </Text>
+            </Banner>
+            <Text as="p" tone="subdued">
+              Spróbuj odświeżyć stronę. Jeśli problem się powtarza,
+              skontaktuj się z pomocą techniczną.
+              <br />
+              Try refreshing the page. If this keeps happening, please
+              contact support.
+            </Text>
+            <Button url="/app">Size Advisor</Button>
+          </BlockStack>
+        </Card>
+      </Page>
+    </AppProvider>
+  );
+}
