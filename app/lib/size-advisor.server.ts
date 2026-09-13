@@ -857,11 +857,21 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
   const bottomElastic =
     useWaist &&
     lengthDimFn != null &&
-    lengthSpread >= 5 &&
-    usable.length >= 2 &&
-    (extraction.elasticWaist ||
-      (waistSpreadForElasticGuess <= 10 &&
-        usable.every((r) => (primaryOf(r) as number) < bodyPrimary - 3)));
+    (usable.length === 0
+      ? // Zero danych o pasie w CAŁEJ tabeli (np. luźne szorty ze sznurkiem,
+        // sklasyfikowane tylko przez "długość"/"długość nogawki") — długość
+        // to jedyny sygnał, jaki w ogóle mamy, więc próg jest taki sam, jak
+        // ten, którym w ogóle wybraliśmy `lengthDimFn` (≥2 cm rozrzutu) —
+        // podnoszenie go do 5 miało sens tylko jako zabezpieczenie PRZED
+        // odrzuceniem lepszej, obwodowej ścieżki, a takiej tu nie ma. Bez
+        // tego cała (realna, kompletna) tabela była ignorowana na rzecz
+        // ogólnego oszacowania z samego wzrostu/wagi.
+        lengthSpread >= 2
+      : lengthSpread >= 5 &&
+        (extraction.elasticWaist ||
+          (usable.length >= 2 &&
+            waistSpreadForElasticGuess <= 10 &&
+            usable.every((r) => (primaryOf(r) as number) < bodyPrimary - 3))));
   const proportional = topProportional || bottomElastic;
 
   let candRows: NormalizedSizeRow[];
