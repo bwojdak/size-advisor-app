@@ -899,6 +899,21 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
     target = valueOf(pool[idx]);
     window = [target - 1, target + 1];
     candRows = [pool[idx]];
+    // Pinezka NIE może być przypięta do samej wartości wybranego rozmiaru
+    // (dyskretnej) — inaczej przy progu kroku (np. dokładnie 6 cm od wzrostu
+    // modela, gdzie zaokrąglenie .5 przeskakuje z 0 na 1) 1 cm wzrostu klienta
+    // zmienia rekomendowany rozmiar bez ŻADNEGO wcześniejszego ostrzeżenia na
+    // suwaku — pinezka po prostu teleportuje się do innej kratki. Ciągła
+    // pozycja (interpolacja `raw` między sąsiednimi wierszami w `pool`)
+    // sprawia, że pinezka PODJEŻDŻA pod krawędź, zanim rozmiar faktycznie
+    // się zmieni — tak samo jak w trybie „po długości bez wzorca" niżej.
+    const contIdx = clamp(baseIdx + raw, 0, pool.length - 1);
+    const contLo = Math.floor(contIdx);
+    const contHi = Math.min(contLo + 1, pool.length - 1);
+    const contFrac = contIdx - contLo;
+    scaleTarget =
+      valueOf(pool[contLo]) +
+      (valueOf(pool[contHi]) - valueOf(pool[contLo])) * contFrac;
     // Zawsze dołóż sąsiada po stronie, w którą „ciągnie" wzrost — żeby
     // „Dopasowany"/„Luźny" miało czym operować (wcześniej przy małym frac
     // preferencja fasonu była w tym trybie po cichu ignorowana).
