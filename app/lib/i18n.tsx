@@ -248,7 +248,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "index.card.purchases.tooltip":
       "Potwierdzone zakupy, w których klient dodał do koszyka rozmiar z rekomendacji. Szacowana redukcja zwrotów (~30% tych zakupów) to założenie modelowe, nie wartość zmierzona w Twoim sklepie.",
     "index.card.purchases.helpAria": "Skąd ta liczba?",
-    "index.card.purchases.sub": "{cart} dodań do koszyka · szac. −{returns} zwrotów",
+    "index.card.purchases.sub": "{cart} dodań do koszyka · szac. redukcja zwrotów: −{returns}",
     "index.card.status.title": "Status aplikacji",
     "index.card.status.active": "Aktywny",
     "index.card.status.inactive": "Wyłączony",
@@ -702,7 +702,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "index.card.purchases.tooltip":
       "Confirmed purchases where the customer added a recommended size to cart. The estimated return reduction (~30% of these purchases) is a modeling assumption, not a value measured in your store.",
     "index.card.purchases.helpAria": "Where does this number come from?",
-    "index.card.purchases.sub": "{cart} added to cart · est. −{returns} returns",
+    "index.card.purchases.sub": "{cart} added to cart · est. return reduction: −{returns}",
     "index.card.status.title": "App status",
     "index.card.status.active": "Active",
     "index.card.status.inactive": "Disabled",
