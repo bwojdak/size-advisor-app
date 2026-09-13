@@ -75,6 +75,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       addedToCart: true,
       purchased: true,
       purchasedAt: true,
+      orderId: true,
       orderTotal: true,
       orderCurrency: true,
       returned: true,
@@ -105,11 +106,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         )
       : null;
 
-  // Przychód przypisany — suma wartości zamówień z zakupem polecanego rozmiaru,
-  // rozbita po walucie (zwykle jedna na sklep).
+  // Przychód przypisany — suma wartości ZAMÓWIEŃ (nie rekomendacji) z zakupem
+  // polecanego rozmiaru, rozbita po walucie. Klient, który kupił 2 polecane
+  // produkty w jednym zamówieniu, dostaje 2 wpisy AdvisorLog — oba oznaczone
+  // tym samym `orderId` i tą samą pełną wartością zamówienia (webhook
+  // orders/create stempluje ją na KAŻDYM dopasowanym wierszu). Licząc bez
+  // odchudzania po orderId, taki przychód liczyłby się podwójnie (a przy 3
+  // produktach — potrójnie), zawyżając kartę wbrew jej własnej etykiecie
+  // ("Total value of ORDERS", nie "suma po rekomendacjach").
   const revByCcy = new Map<string, number>();
+  const countedOrders = new Set<string>();
   for (const r of rows) {
     if (r.purchased && typeof r.orderTotal === "number" && r.orderTotal > 0) {
+      const orderKey = r.orderId || null;
+      if (orderKey) {
+        if (countedOrders.has(orderKey)) continue;
+        countedOrders.add(orderKey);
+      }
       const c = r.orderCurrency || "USD";
       revByCcy.set(c, (revByCcy.get(c) ?? 0) + r.orderTotal);
     }

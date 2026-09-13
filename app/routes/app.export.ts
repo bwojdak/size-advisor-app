@@ -42,7 +42,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const date = new Date().toISOString().slice(0, 10);
 
   if (new URL(request.url).searchParams.get("report") === "products") {
-    const windowDays = caps.historyDays > 0 ? caps.historyDays : 400;
+    // Uwaga: żaden plan z csvExport dziś nie ma historyDays===0 (Free, jedyny
+    // taki plan, ma csvExport=false i jest odcięty bramką wyżej) — ale gdyby
+    // to się zmieniło, `|| 400` cichcem wracałoby do dokładnie tego samego
+    // buga, który naprawiliśmy w Analityce (0 dni = więcej historii niż
+    // płatny plan). Bez fallbacku, zgodnie z kontraktem PlanCapabilities.
+    const windowDays = caps.historyDays;
     const since = new Date();
     since.setDate(since.getDate() - windowDays);
 
