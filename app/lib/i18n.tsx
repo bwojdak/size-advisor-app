@@ -399,11 +399,16 @@ const messages: Record<Locale, Record<string, string>> = {
       ".sa-pill-btn                 — pojedyncza pigułka\n" +
       ".sa-pill-btn.active          — wybrana pigułka\n" +
       ".sa-input-col input          — pola wzrost / waga\n" +
+      ".sa-step-dots                — kropki postępu (krok 1/2)\n" +
+      "#sa-next-btn                 — przycisk „Dalej” (krok 1)\n" +
+      "#sa-back-btn / .sa-step-back — przycisk „Wstecz” (krok 2)\n" +
       "#get-recommendation-btn      — przycisk „Oblicz rozmiar”\n" +
       ".sa-result                   — ramka wyniku\n" +
       ".sa-result--ok / --err / --loading — stany wyniku\n" +
       ".sa-result-size              — polecany rozmiar (duży tekst)\n" +
-      ".sa-result-why               — uzasadnienie AI\n" +
+      ".sa-fit-scale                — suwak dopasowania (Ciaśniej/Luźniej)\n" +
+      ".sa-fit-pin                  — pinezka „Ty” na suwaku\n" +
+      ".sa-fit-cell--rec            — podświetlona kratka rekomendowanego rozmiaru\n" +
       ".sa-add-to-cart              — przycisk „Dodaj do koszyka”\n" +
       ".sa-powered-by               — znak „Size Advisor”\n\n" +
       "Twój CSS doklejany jest na końcu — dodaj !important, jeśli reguła nie działa.",
@@ -853,11 +858,16 @@ const messages: Record<Locale, Record<string, string>> = {
       ".sa-pill-btn                 — a single pill\n" +
       ".sa-pill-btn.active          — the selected pill\n" +
       ".sa-input-col input          — the height / weight inputs\n" +
+      ".sa-step-dots                — step-progress dots (step 1/2)\n" +
+      "#sa-next-btn                 — the “Next” button (step 1)\n" +
+      "#sa-back-btn / .sa-step-back — the “Back” button (step 2)\n" +
       "#get-recommendation-btn      — the “Calculate size” button\n" +
       ".sa-result                   — the result box\n" +
       ".sa-result--ok / --err / --loading — result states\n" +
       ".sa-result-size              — recommended size (large text)\n" +
-      ".sa-result-why               — the AI explanation\n" +
+      ".sa-fit-scale                — the fit slider (Tighter/Looser)\n" +
+      ".sa-fit-pin                  — the “You” pin on the slider\n" +
+      ".sa-fit-cell--rec            — the highlighted recommended-size cell\n" +
       ".sa-add-to-cart              — the “Add to cart” button\n" +
       ".sa-powered-by               — the “Size Advisor” mark\n\n" +
       "Your CSS is appended last — add !important if a rule doesn’t take effect.",
