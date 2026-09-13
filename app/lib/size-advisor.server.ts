@@ -241,7 +241,32 @@ function estimateLetterSize(
   build: string,
   fit: FitPreference,
   category: GarmentCategory,
+  modelHeight?: number | null,
+  modelSize?: string | null,
 ): string {
+  // Wzorzec marki ("model 185 cm nosi M") to konkretna deklaracja DLA TEGO
+  // PRODUKTU — silniejszy sygnał niż ogólne pasmo klatki z samego wzrostu/
+  // wagi, nawet gdy produkt nie ma pełnej tabeli wymiarów (tylko ten jeden
+  // fakt w opisie). Ta sama logika co kotwica na wzorcu w resolveSize
+  // (patrz niżej), tylko po skali CANON_SIZES zamiast po wierszach tabeli.
+  const normModelSize = modelSize?.toUpperCase().replace(/\s+/g, "");
+  if (
+    modelHeight &&
+    modelHeight > 120 &&
+    modelHeight < 220 &&
+    normModelSize &&
+    CANON_SIZES.includes(normModelSize)
+  ) {
+    const baseIdx = CANON_SIZES.indexOf(normModelSize);
+    const HEIGHT_PER_SIZE = 12;
+    const raw = (h - modelHeight) / HEIGHT_PER_SIZE;
+    const step = raw >= 0 ? Math.round(raw) : -Math.round(-raw);
+    let idx = clamp(baseIdx + step, 0, CANON_SIZES.length - 1);
+    if (fit === "loose") idx += 1;
+    idx = clamp(idx, CANON_SIZES.indexOf("XS"), CANON_SIZES.indexOf("XXL"));
+    return CANON_SIZES[idx];
+  }
+
   const chest = estimateChest(h, w, gender, build);
   // Górna granica pasma → etykieta (pełny obwód w cm).
   const bands = chestBands(gender);
@@ -1649,14 +1674,31 @@ export function decideSize(
   // braku tabeli i tak zawsze zgaduje „M"). Nagłówek krótki, szczegóły uczciwe.
   let size =
     height > 0
-      ? estimateLetterSize(height, weight, gender, bodyType, fit, extraction.category)
+      ? estimateLetterSize(
+          height,
+          weight,
+          gender,
+          bodyType,
+          fit,
+          extraction.category,
+          extraction.modelHeight,
+          extraction.modelSize,
+        )
       : (extraction.fallbackSize || "M").toUpperCase().replace(/\s+/g, "");
 
   // Strażnik monotoniczności (tylko „dołki", jak w resolveSize): jeśli sylwetka
   // 4 cm niższa i 4 cm wyższa dają rozmiar nie mniejszy, a bieżąca mniejszy —
   // podnieś do mniejszego z sąsiadów.
   if (height - 4 >= 140) {
-    const args = [weight, gender, bodyType, fit, extraction.category] as const;
+    const args = [
+      weight,
+      gender,
+      bodyType,
+      fit,
+      extraction.category,
+      extraction.modelHeight,
+      extraction.modelSize,
+    ] as const;
     const lo = estimateLetterSize(height - 4, ...args);
     const hi = estimateLetterSize(height + 4, ...args);
     if (sizeIndex(size) < sizeIndex(lo) && sizeIndex(size) < sizeIndex(hi)) {
@@ -1689,12 +1731,28 @@ export function decideSize(
       ? CANON_SIZES[sIdx + 1]
       : null;
   const isPl = (d.locale || "pl").toLowerCase().slice(0, 2) === "pl";
+  // Ten sam wzorzec marki, który anchoruje kotwicę w resolveSize (gdy jest
+  // tabela), działa też tutaj — więc opis ma być uczciwy o TYM, co faktycznie
+  // zdecydowało: wzrost modela z opisu, nie ogólne pasmo z wagi/budowy.
+  const normModelSize = extraction.modelSize?.toUpperCase().replace(/\s+/g, "");
+  const usedModelAnchor = Boolean(
+    height > 0 &&
+      extraction.modelHeight &&
+      extraction.modelHeight > 120 &&
+      extraction.modelHeight < 220 &&
+      normModelSize &&
+      CANON_SIZES.includes(normModelSize),
+  );
   const headline = isPl
     ? `Rozmiar ${size} — oszacowany na podstawie Twoich wymiarów.`
     : `Size ${size} — estimated from your measurements.`;
-  const detail = isPl
-    ? `Ten produkt nie ma tabeli rozmiarów, więc rozmiar ${size} oszacowaliśmy z Twojego wzrostu (${Math.round(height)} cm), wagi (${Math.round(weight)} kg) i budowy${fit === "loose" ? " oraz preferencji luźniejszego fasonu" : ""}. Dla pewności sprawdź rozmiarówkę przy produkcie.`
-    : `This product has no size chart, so size ${size} is estimated from your height (${Math.round(height)} cm), weight (${Math.round(weight)} kg) and build${fit === "loose" ? ", plus your looser fit preference" : ""}. Please double-check the product's own size guide.`;
+  const detail = usedModelAnchor
+    ? isPl
+      ? `Ten produkt nie ma tabeli wymiarów, ale opis podaje wzorzec marki: model ${extraction.modelHeight} cm nosi ${extraction.modelSize}. Skorygowaliśmy to o Twój wzrost (${Math.round(height)} cm)${fit === "loose" ? " i preferencję luźniejszego fasonu" : ""} — stąd ${size}. Dla pewności sprawdź rozmiarówkę przy produkcie.`
+      : `This product has no size chart, but its description gives a brand reference: a ${extraction.modelHeight} cm model wears ${extraction.modelSize}. We adjusted that for your height (${Math.round(height)} cm)${fit === "loose" ? " and your looser fit preference" : ""} — hence ${size}. Please double-check the product's own size guide.`
+    : isPl
+      ? `Ten produkt nie ma tabeli rozmiarów, więc rozmiar ${size} oszacowaliśmy z Twojego wzrostu (${Math.round(height)} cm), wagi (${Math.round(weight)} kg) i budowy${fit === "loose" ? " oraz preferencji luźniejszego fasonu" : ""}. Dla pewności sprawdź rozmiarówkę przy produkcie.`
+      : `This product has no size chart, so size ${size} is estimated from your height (${Math.round(height)} cm), weight (${Math.round(weight)} kg) and build${fit === "loose" ? ", plus your looser fit preference" : ""}. Please double-check the product's own size guide.`;
   return {
     size,
     explanation: headline,
