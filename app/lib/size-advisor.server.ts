@@ -424,7 +424,7 @@ ZASADY:
 - "dzianina": true jeśli materiał jest rozciągliwy (dzianina, jersey, elastan/spandex/lycra, modal, prążek, sweter). false dla tkaniny (denim/jeans, popelina, twill, gabardyna, len, płótno, "woven").
 - "pasNaGumce": true jeśli pas jest elastyczny / na gumce / ze sznurkiem / ściągaczem (dresy, joggery). false dla sztywnego pasa z guzikiem (jeansy, chinosy, spodnie garniturowe).
 - "odziezWierzchnia": true dla kurtki, płaszcza, parki, marynarki noszonej na wierzch. false dla t-shirtu, bluzy, koszuli.
-- "modelWzrost" / "modelRozmiar": jeśli opis podaje wzorzec typu "Model ma 184 cm i nosi rozmiar L", wpisz 184 i "L". Inaczej null.
+- "modelWzrost" / "modelRozmiar": w opisie szukaj wzorca marki AKTYWNIE, w KAŻDEJ formie, nie tylko pełnego zdania — sklepy odzieżowe (zwłaszcza streetwear) najczęściej piszą to skrótowo, np. samym "Model 185/M" albo "Model: 188cm/L" na końcu opisu, bez słów "wzrost"/"nosi rozmiar". Rozpoznaj też warianty: "Model ma 184 cm i nosi rozmiar L", "wzrost modela: 190 cm, rozmiar: XL", "185cm / M". Liczba obok liter S/M/L/XL/XXL itd. w kontekście słowa "model" to prawie zawsze TO WŁAŚNIE, nawet bez dodatkowych słów. Jeśli naprawdę nie ma żadnej wzmianki o modelu — null.
 `;
 }
 
