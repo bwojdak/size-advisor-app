@@ -818,13 +818,24 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
   // faktycznie się różni między rozmiarami (≥5 cm rozrzutu). Inaczej (np. jersey
   // jorts, gdzie nogawka to 63–66 cm) lecimy ścieżką obwodową z zapasem na gumę.
   const lengthSpread = lengthDimFn ? spread(lengthDimFn) : 0;
+  // Domysł "to pewnie guma" (bez flagi z AI) wolno włączyć TYLKO gdy pas w
+  // tabeli faktycznie prawie się nie zmienia między rozmiarami (typowe dla
+  // jednego rozmiaru gumy w kilku długościach) — inaczej klient, którego pas
+  // po prostu przerasta CAŁĄ tabelę (np. jeansy 26–36, żaden rozmiar w ogóle
+  // nie jest gumą), trafiał do trybu "po długości", który ignoruje pas i
+  // potrafi wylosować dowolny z rozmiarów remisujących długością (nawet dużo
+  // za mały) zamiast uczciwie zgłosić "największy dostępny" (patrz podłoga
+  // obwodu niżej). Gdy pas realnie różnicuje rozmiary, wierzymy tylko
+  // jawnej fladze `elasticWaist`.
+  const waistSpreadForElasticGuess = useWaist ? spread(primaryOf) : 0;
   const bottomElastic =
     useWaist &&
     lengthDimFn != null &&
     lengthSpread >= 5 &&
     usable.length >= 2 &&
     (extraction.elasticWaist ||
-      usable.every((r) => (primaryOf(r) as number) < bodyPrimary - 3));
+      (waistSpreadForElasticGuess <= 10 &&
+        usable.every((r) => (primaryOf(r) as number) < bodyPrimary - 3)));
   const proportional = topProportional || bottomElastic;
 
   let candRows: NormalizedSizeRow[];
