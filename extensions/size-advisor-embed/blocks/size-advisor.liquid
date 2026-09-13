@@ -63,65 +63,80 @@
       <p class="size-advisor-desc"{% if sa_modal_subtitle == blank %} data-i18n="modal_desc"{% endif %}>{% if sa_modal_subtitle != blank %}{{ sa_modal_subtitle }}{% else %}{{ 'size_advisor.modal_desc' | t }}{% endif %}</p>
 
       <div class="size-advisor-form">
-        <span class="sa-label" id="sa-gender-label-{{ block.id }}" data-i18n="gender">{{ 'size_advisor.gender' | t }}</span>
-        <div class="sa-pill-group sa-pill-group--2" id="sa-gender-group" role="group" aria-labelledby="sa-gender-label-{{ block.id }}">
-          <button type="button" class="sa-pill-btn active" data-value="male" aria-pressed="true" data-i18n="gender_male">{{ 'size_advisor.gender_male' | t }}</button>
-          <button type="button" class="sa-pill-btn" data-value="female" aria-pressed="false" data-i18n="gender_female">{{ 'size_advisor.gender_female' | t }}</button>
+        <div class="sa-step-dots" aria-hidden="true">
+          <span class="sa-step-dot is-active"></span>
+          <span class="sa-step-dot"></span>
         </div>
 
-        <div class="sa-grid-inputs">
-          <div class="sa-input-col">
-            <div class="sa-field-head">
-              <label class="sa-label" for="user-height" data-i18n="height">{{ 'size_advisor.height' | t }}</label>
-              <div class="sa-unit-toggle" id="sa-height-unit" role="group" aria-label="cm / in">
-                <button type="button" data-unit="cm" aria-pressed="true">cm</button>
-                <button type="button" data-unit="in" aria-pressed="false">in</button>
+        <div class="sa-step" id="sa-step-1" data-sa-step="1">
+          <span class="sa-label" id="sa-gender-label-{{ block.id }}" data-i18n="gender">{{ 'size_advisor.gender' | t }}</span>
+          <div class="sa-pill-group sa-pill-group--2" id="sa-gender-group" role="group" aria-labelledby="sa-gender-label-{{ block.id }}">
+            <button type="button" class="sa-pill-btn active" data-value="male" aria-pressed="true" data-i18n="gender_male">{{ 'size_advisor.gender_male' | t }}</button>
+            <button type="button" class="sa-pill-btn" data-value="female" aria-pressed="false" data-i18n="gender_female">{{ 'size_advisor.gender_female' | t }}</button>
+          </div>
+
+          <div class="sa-grid-inputs">
+            <div class="sa-input-col">
+              <div class="sa-field-head">
+                <label class="sa-label" for="user-height" data-i18n="height">{{ 'size_advisor.height' | t }}</label>
+                <div class="sa-unit-toggle" id="sa-height-unit" role="group" aria-label="cm / in">
+                  <button type="button" data-unit="cm" aria-pressed="true">cm</button>
+                  <button type="button" data-unit="in" aria-pressed="false">in</button>
+                </div>
               </div>
+              <input type="number" id="user-height" inputmode="decimal" data-i18n-ph="height_ph" placeholder="{{ 'size_advisor.height_ph' | t }}" min="140" max="215">
             </div>
-            <input type="number" id="user-height" inputmode="decimal" data-i18n-ph="height_ph" placeholder="{{ 'size_advisor.height_ph' | t }}" min="140" max="215">
-          </div>
-          <div class="sa-input-col">
-            <div class="sa-field-head">
-              <label class="sa-label" for="user-weight" data-i18n="weight">{{ 'size_advisor.weight' | t }}</label>
-              <div class="sa-unit-toggle" id="sa-weight-unit" role="group" aria-label="kg / lb">
-                <button type="button" data-unit="kg" aria-pressed="true">kg</button>
-                <button type="button" data-unit="lb" aria-pressed="false">lb</button>
+            <div class="sa-input-col">
+              <div class="sa-field-head">
+                <label class="sa-label" for="user-weight" data-i18n="weight">{{ 'size_advisor.weight' | t }}</label>
+                <div class="sa-unit-toggle" id="sa-weight-unit" role="group" aria-label="kg / lb">
+                  <button type="button" data-unit="kg" aria-pressed="true">kg</button>
+                  <button type="button" data-unit="lb" aria-pressed="false">lb</button>
+                </div>
               </div>
+              <input type="number" id="user-weight" inputmode="decimal" data-i18n-ph="weight_ph" placeholder="{{ 'size_advisor.weight_ph' | t }}" min="40" max="180">
             </div>
-            <input type="number" id="user-weight" inputmode="decimal" data-i18n-ph="weight_ph" placeholder="{{ 'size_advisor.weight_ph' | t }}" min="40" max="180">
           </div>
-        </div>
 
-        <span class="sa-label" id="sa-body-label-{{ block.id }}" data-i18n="body">{{ 'size_advisor.body' | t }}</span>
-        <div class="sa-pill-group sa-pill-group--2" id="sa-body-group" role="group" aria-labelledby="sa-body-label-{{ block.id }}">
-          <button type="button" class="sa-pill-btn" data-value="slim" aria-pressed="false" data-i18n="body_slim">{{ 'size_advisor.body_slim' | t }}</button>
-          <button type="button" class="sa-pill-btn active" data-value="standard" aria-pressed="true" data-i18n="body_standard">{{ 'size_advisor.body_standard' | t }}</button>
-          <button type="button" class="sa-pill-btn" data-value="athletic" aria-pressed="false" data-i18n="body_athletic">{{ 'size_advisor.body_athletic' | t }}</button>
-          <button type="button" class="sa-pill-btn" data-value="plus" aria-pressed="false" data-i18n="body_plus">{{ 'size_advisor.body_plus' | t }}</button>
-        </div>
-
-        <div id="sa-fit-wrap" hidden>
-          <span class="sa-label" id="sa-fit-label-{{ block.id }}" data-i18n="fit">{{ 'size_advisor.fit' | t }}</span>
-          <div class="sa-pill-group sa-pill-group--3" id="sa-fit-group" role="group" aria-labelledby="sa-fit-label-{{ block.id }}">
-            <button type="button" class="sa-pill-btn" data-value="fitted" aria-pressed="false" data-i18n="fit_fitted">{{ 'size_advisor.fit_fitted' | t }}</button>
-            <button type="button" class="sa-pill-btn active" data-value="regular" aria-pressed="true" data-i18n="fit_regular">{{ 'size_advisor.fit_regular' | t }}</button>
-            <button type="button" class="sa-pill-btn" data-value="loose" aria-pressed="false" data-i18n="fit_loose">{{ 'size_advisor.fit_loose' | t }}</button>
-          </div>
-        </div>
-
-        <div id="sa-garment-wrap" hidden>
-          <button type="button" id="sa-garment-toggle" class="sa-garment-toggle" aria-expanded="false" aria-controls="sa-garment-fields" data-i18n="garment_toggle">
-            {{ 'size_advisor.garment_toggle' | t }}
+          <button type="button" id="sa-next-btn">
+            <span class="sa-btn-label" data-i18n="next">{{ 'size_advisor.next' | t }}</span>
           </button>
-          <div id="sa-garment-fields" class="sa-garment-fields" hidden>
-            <div class="sa-grid-inputs" id="sa-garment-dyn"></div>
-            <p class="sa-garment-hint" data-i18n="garment_hint">{{ 'size_advisor.garment_hint' | t }}</p>
-          </div>
         </div>
 
-        <button type="button" id="get-recommendation-btn">
-          <span class="sa-btn-label" data-i18n="calc">{{ 'size_advisor.calc' | t }}</span>
-        </button>
+        <div class="sa-step" id="sa-step-2" data-sa-step="2" hidden>
+          <button type="button" class="sa-step-back" id="sa-back-btn" data-i18n="back">{{ 'size_advisor.back' | t }}</button>
+
+          <span class="sa-label" id="sa-body-label-{{ block.id }}" data-i18n="body">{{ 'size_advisor.body' | t }}</span>
+          <div class="sa-pill-group sa-pill-group--2" id="sa-body-group" role="group" aria-labelledby="sa-body-label-{{ block.id }}">
+            <button type="button" class="sa-pill-btn" data-value="slim" aria-pressed="false" data-i18n="body_slim">{{ 'size_advisor.body_slim' | t }}</button>
+            <button type="button" class="sa-pill-btn active" data-value="standard" aria-pressed="true" data-i18n="body_standard">{{ 'size_advisor.body_standard' | t }}</button>
+            <button type="button" class="sa-pill-btn" data-value="athletic" aria-pressed="false" data-i18n="body_athletic">{{ 'size_advisor.body_athletic' | t }}</button>
+            <button type="button" class="sa-pill-btn" data-value="plus" aria-pressed="false" data-i18n="body_plus">{{ 'size_advisor.body_plus' | t }}</button>
+          </div>
+
+          <div id="sa-fit-wrap" hidden>
+            <span class="sa-label" id="sa-fit-label-{{ block.id }}" data-i18n="fit">{{ 'size_advisor.fit' | t }}</span>
+            <div class="sa-pill-group sa-pill-group--3" id="sa-fit-group" role="group" aria-labelledby="sa-fit-label-{{ block.id }}">
+              <button type="button" class="sa-pill-btn" data-value="fitted" aria-pressed="false" data-i18n="fit_fitted">{{ 'size_advisor.fit_fitted' | t }}</button>
+              <button type="button" class="sa-pill-btn active" data-value="regular" aria-pressed="true" data-i18n="fit_regular">{{ 'size_advisor.fit_regular' | t }}</button>
+              <button type="button" class="sa-pill-btn" data-value="loose" aria-pressed="false" data-i18n="fit_loose">{{ 'size_advisor.fit_loose' | t }}</button>
+            </div>
+          </div>
+
+          <div id="sa-garment-wrap" hidden>
+            <button type="button" id="sa-garment-toggle" class="sa-garment-toggle" aria-expanded="false" aria-controls="sa-garment-fields" data-i18n="garment_toggle">
+              {{ 'size_advisor.garment_toggle' | t }}
+            </button>
+            <div id="sa-garment-fields" class="sa-garment-fields" hidden>
+              <div class="sa-grid-inputs" id="sa-garment-dyn"></div>
+              <p class="sa-garment-hint" data-i18n="garment_hint">{{ 'size_advisor.garment_hint' | t }}</p>
+            </div>
+          </div>
+
+          <button type="button" id="get-recommendation-btn">
+            <span class="sa-btn-label" data-i18n="calc">{{ 'size_advisor.calc' | t }}</span>
+          </button>
+        </div>
       </div>
 
       <div id="size-advisor-result" class="sa-result" role="status" aria-live="polite" hidden></div>
@@ -459,7 +474,8 @@
   #sa-garment-dyn .sa-input-col { flex: 1 1 88px; min-width: 88px; }
   .sa-garment-hint { margin: 6px 0 0; font-size: 12px; color: var(--sa-muted); line-height: 1.4; }
 
-  #get-recommendation-btn {
+  #get-recommendation-btn,
+  #sa-next-btn {
     position: relative;
     width: 100%;
     padding: 12px;
@@ -475,12 +491,48 @@
     box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--sa-accent) 60%, transparent);
     transition: transform 0.12s ease, box-shadow 0.18s ease, opacity 0.16s ease;
   }
-  #get-recommendation-btn:hover {
+  #get-recommendation-btn:hover,
+  #sa-next-btn:hover {
     transform: translateY(-1px);
     box-shadow: 0 14px 30px -10px color-mix(in srgb, var(--sa-accent) 65%, transparent);
   }
-  #get-recommendation-btn:active { transform: translateY(0); }
+  #get-recommendation-btn:active,
+  #sa-next-btn:active { transform: translateY(0); }
   #get-recommendation-btn[disabled] { opacity: 0.7; cursor: default; box-shadow: none; transform: none; }
+
+  .sa-step-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    padding: 0 0 12px;
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sa-muted);
+    cursor: pointer;
+  }
+  .sa-step-back:hover { color: var(--sa-accent); }
+  .sa-step-back::before { content: "←"; }
+
+  .sa-step-dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin: 2px 0 16px;
+  }
+  .sa-step-dots span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sa-border);
+    transition: background 0.2s ease, transform 0.2s ease;
+  }
+  .sa-step-dots span.is-active {
+    background: var(--sa-accent);
+    transform: scale(1.25);
+  }
   #get-recommendation-btn.is-loading .sa-btn-label { visibility: hidden; }
   #get-recommendation-btn.is-loading::after {
     content: "";
@@ -772,6 +824,8 @@
       fit_fitted: "Dopasowany",
       fit_regular: "Klasyczny",
       fit_loose: "Luźny",
+      next: "Dalej",
+      back: "Wstecz",
       fit_tighter: "Ciaśniej",
       fit_looser: "Luźniej",
       fit_you: "Ty",
@@ -824,6 +878,8 @@
       fit_fitted: "Fitted",
       fit_regular: "Regular",
       fit_loose: "Loose",
+      next: "Next",
+      back: "Back",
       fit_tighter: "Tighter",
       fit_looser: "Looser",
       fit_you: "You",
@@ -1046,7 +1102,50 @@
     const calcBtn = document.getElementById('get-recommendation-btn');
     const resultDiv = document.getElementById('size-advisor-result');
     const cartAction = document.getElementById('sa-cart-action');
+    const nextBtn = document.getElementById('sa-next-btn');
+    const backBtn = document.getElementById('sa-back-btn');
+    const step1El = document.getElementById('sa-step-1');
+    const step2El = document.getElementById('sa-step-2');
+    const stepDots = modal ? modal.querySelectorAll('.sa-step-dots span') : [];
     let lastFocus = null;
+
+    // Formularz podzielony na 2 kroki (wzrost/waga vs budowa/dopasowanie) —
+    // krótszy widoczny ekran naraz, zwłaszcza na telefonie. Wartości pól nie
+    // znikają przy przełączaniu (to po prostu show/hide tych samych węzłów).
+    function goToStep(n) {
+      if (step1El) step1El.hidden = n !== 1;
+      if (step2El) step2El.hidden = n !== 2;
+      stepDots.forEach((d, i) => d.classList.toggle('is-active', i === n - 1));
+      if (resultDiv && !resultDiv.classList.contains('sa-result--ok')) {
+        resultDiv.hidden = true;
+      }
+    }
+
+    function validateStep1() {
+      const rawHeight = Number(document.getElementById('user-height').value);
+      const rawWeight = Number(document.getElementById('user-weight').value);
+      const height = Math.round(hUnit === 'in' ? rawHeight * IN_PER_CM : rawHeight);
+      const weight = Math.round(wUnit === 'lb' ? rawWeight * LB_PER_KG : rawWeight);
+      if (!height || height < 140 || height > 215) {
+        setResult('err', String(I18N.err_height).replace('[range]', rangeLabel('height')));
+        return false;
+      }
+      if (!weight || weight < 40 || weight > 180) {
+        setResult('err', String(I18N.err_weight).replace('[range]', rangeLabel('weight')));
+        return false;
+      }
+      return true;
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        if (!validateStep1()) return;
+        goToStep(2);
+      });
+    }
+    if (backBtn) {
+      backBtn.addEventListener('click', () => goToStep(1));
+    }
 
     function openModal() {
       if (!modal) return;
@@ -1349,6 +1448,10 @@
       calcBtn.addEventListener('click', async () => {
         if (calcBtn.dataset.loading === '1') return;
 
+        // Normalnie już zweryfikowane przez "Dalej" (krok 1) — sprawdzamy
+        // ponownie na wszelki wypadek (np. ktoś zmienił pole po powrocie).
+        if (!validateStep1()) return;
+
         const rawHeight = Number(document.getElementById('user-height').value);
         const rawWeight = Number(document.getElementById('user-weight').value);
         // Serwer i silnik oczekują cm/kg — konwersja i zaokrąglenie tutaj.
@@ -1356,15 +1459,6 @@
         const weight = Math.round(wUnit === 'lb' ? rawWeight * LB_PER_KG : rawWeight);
         const gender = document.querySelector('#sa-gender-group .sa-pill-btn.active')?.dataset.value || 'male';
         const bodyType = document.querySelector('#sa-body-group .sa-pill-btn.active')?.dataset.value || 'standard';
-
-        if (!height || height < 140 || height > 215) {
-          setResult('err', String(I18N.err_height).replace('[range]', rangeLabel('height')));
-          return;
-        }
-        if (!weight || weight < 40 || weight > 180) {
-          setResult('err', String(I18N.err_weight).replace('[range]', rangeLabel('weight')));
-          return;
-        }
 
         const _fp = askFitPref
           ? (document.querySelector('#sa-fit-group .sa-pill-btn.active')?.dataset.value || 'regular')
@@ -1586,6 +1680,10 @@
         const hit = p && cachedSize(p);
         if (hit && !hit.na && hit.size) {
           applyProfile(p);
+          // Wynik jest już gotowy (z cache) — pokaż od razu krok 2 (tam jest
+          // przycisk "Oblicz ponownie" i sam wynik), nie każ przechodzić przez
+          // krok 1 na nowo dla danych, które już mamy.
+          goToStep(2);
           showResult({
             size: hit.size,
             neighborSmaller: hit.neighborSmaller,
