@@ -68,7 +68,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const systems = await db.sizingSystem.findMany({
     where: { shopId: settings.id },
-    orderBy: { updatedAt: "desc" },
+    orderBy: { name: "asc" },
   });
   const mappedRules = await db.productRule.findMany({
     where: { shopId: settings.id, sizingSystemId: { not: null } },
