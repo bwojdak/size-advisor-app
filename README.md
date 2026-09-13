@@ -4,6 +4,14 @@ A Shopify app that recommends the right clothing size to shoppers based on their
 
 Built solo, end to end: storefront widget, admin panel, sizing engine, AI integration, subscription billing, and analytics.
 
+<table>
+<tr>
+<td width="33%"><img src="docs/screenshots/widget.png" alt="Storefront widget with fit slider"><br><sub>Storefront widget — 2-step size finder with a live fit slider</sub></td>
+<td width="33%"><img src="docs/screenshots/admin-home.png" alt="Admin home dashboard"><br><sub>Admin home — usage, quota, and recent queries at a glance</sub></td>
+<td width="33%"><img src="docs/screenshots/analytics.png" alt="Analytics dashboard"><br><sub>Analytics — conversion funnel, revenue, and return-rate impact</sub></td>
+</tr>
+</table>
+
 ## The core idea
 
 Most "size finder" apps either (a) trust an LLM to eyeball a size chart and guess a size, or (b) trust a rigid rule-of-thumb formula and ignore the merchant's real chart entirely. Both fail in visible, embarrassing ways.
