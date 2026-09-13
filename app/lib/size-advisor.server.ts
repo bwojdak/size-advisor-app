@@ -338,7 +338,7 @@ export function buildSizeAdvisorPrompt(input: PromptInput): string {
     input.hasSizeChartImage
       ? productSizeData
         ? `\nDołączono też ZDJĘCIE rozmiarówki, ale MASZ już tabelę tekstową powyżej — użyj zdjęcia tylko do uzupełnienia brakującego wymiaru, jeśli w tabeli tekstowej jest luka. Nie dodawaj rozmiarów, których nie ma w tabeli tekstowej.\n`
-        : `\nDo wiadomości dołączono ZDJĘCIE rozmiarówki – odczytaj z niego wszystkie wymiary.\n`
+        : `\nDo wiadomości dołączono ZDJĘCIE rozmiarówki – odczytaj z niego wszystkie wymiary. Diagramy z zaznaczonymi strzałkami (np. "A"/"B" na rysunku ubrania + osobna tabelka z literami wymiarów) miej mocno na uwadze: NAJPIERW policz, ile rozmiarów (wierszy) jest w legendzie/tabelce z liczbami — Twoja odpowiedź MUSI mieć dokładnie tyle samo wierszy w "tabela", nawet skrajne, łatwe do pominięcia (np. XS na górze). Jeśli tekst w komórce jest zbyt mały/niewyraźny, by odczytać go z pewnością — wstaw null w tej komórce. NIE WOLNO wymyślać "ładnej", regularnej progresji (np. co równo +2 cm), żeby wypełnić lukę w odczycie – zmyślona liczba, która "wygląda sensownie", jest gorsza niż null, bo wygląda na prawdziwą, a nie jest.\n`
       : ""
   }`;
 
