@@ -365,21 +365,24 @@ export function SizeGrid({
             {COLS.map((c) => (
               <div
                 key={c.key}
-                style={{ display: "flex", alignItems: "center", gap: "3px" }}
+                style={{ display: "flex", alignItems: "center", gap: "3px", minWidth: 0 }}
               >
-                <Text
-                  as="span"
-                  variant="bodyXs"
-                  tone={
-                    unusualCols.includes(c) ||
-                    incompleteCols.includes(c) ||
-                    flatCols.includes(c)
-                      ? "caution"
-                      : "subdued"
-                  }
-                >
-                  {t(c.labelKey)}
-                </Text>
+                <div style={{ minWidth: 0, overflow: "hidden" }} title={t(c.labelKey)}>
+                  <Text
+                    as="span"
+                    variant="bodyXs"
+                    truncate
+                    tone={
+                      unusualCols.includes(c) ||
+                      incompleteCols.includes(c) ||
+                      flatCols.includes(c)
+                        ? "caution"
+                        : "subdued"
+                    }
+                  >
+                    {t(c.labelKey)}
+                  </Text>
+                </div>
                 <button
                   type="button"
                   onClick={() => removeCol(c.key)}
