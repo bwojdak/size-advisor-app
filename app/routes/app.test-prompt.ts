@@ -6,6 +6,8 @@ import {
   callAI,
   getAIConfig,
   AIQuotaError,
+  parseStructuredRows,
+  structuredRowsAsPromptText,
 } from "../lib/size-advisor.server";
 import { normalizeLocale, requestT } from "../lib/i18n";
 import { loadShopSettings } from "../lib/shop-settings.server";
@@ -123,15 +125,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   // Źródło tabeli i notatek: system (jeśli przypięty) albo własna tabela produktu.
-  const chartSizeData = sizingSystem
-    ? sizingSystem.parsedSizeData
-    : productRule?.parsedSizeData;
   const chartNotes = sizingSystem
     ? sizingSystem.customNotes
     : productRule?.customNotes;
   const chartStructured = sizingSystem
     ? sizingSystem.structuredSizeData
     : (productRule?.structuredSizeData ?? null);
+  // `parsedSizeData` to martwe, stare pole "Opis dla AI" — nie ma już swojego
+  // pola w edytorze (patrz 702b448), więc go nie wysyłamy. Zamiast tego, gdy
+  // jest zweryfikowana siatka, podajemy JĄ jako tabelę (patrz 8c5503a) —
+  // inaczej (tytuł/opis produktu są tu świadomie puste dla systemu, patrz
+  // niżej) AI nie miałoby ŻADNYCH liczb do oceny kategorii/kroju i zgadywałoby
+  // "góra" z automatu, przez co siatka z samym pasem/nogawką (bez klatki)
+  // wyglądałaby jak "brak dopasowania" i tester spadał na szacunek z ciała
+  // mimo realnej, kompletnej tabeli.
+  const structuredRows = parseStructuredRows(chartStructured);
+  const chartSizeData = structuredRows
+    ? structuredRowsAsPromptText(structuredRows)
+    : null;
 
   const adminLocale =
     normalizeLocale(new URL(request.url).searchParams.get("locale")) ?? "pl";
@@ -141,7 +152,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     caps.sizeChartImageAI && !sizingSystem && Boolean(productRule?.sizeChartImage);
 
   const prompt = buildSizeAdvisorPrompt({
-    productTitle: sizingSystem ? "" : productTitle,
+    // Dla systemu: nazwa SYSTEMU (np. "Jeansy"), nie konkretnego produktu —
+    // system jest współdzielony przez wiele produktów, więc nazwa jednego z
+    // nich mogłaby mylić klasyfikację reszty. To samo robi już prawdziwa
+    // analiza (runSystemExtraction w app.sizing-system.ts) — tester ma
+    // symulować rzeczywistość, nie osobną (i bledniejszą) ścieżkę. Sama
+    // pusta nazwa zostawiałaby AI bez ŻADNEJ wskazówki kategorii poza samą
+    // tabelą liczb.
+    productTitle: sizingSystem ? sizingSystem.name : productTitle,
     productDescription: sizingSystem ? "" : productDescription,
     gender: body.gender,
     height,
@@ -184,7 +202,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       usedBrandStyle: Boolean(settings?.aiStyleNotes?.trim()),
       productTitle,
       sizingSystemName: sizingSystem?.name ?? null,
-      usedProductChart: Boolean(chartSizeData?.trim() || useImage),
+      usedProductChart: Boolean(structuredRows || useImage),
       promptTokenCount: result.promptTokenCount,
     });
   } catch (err) {
