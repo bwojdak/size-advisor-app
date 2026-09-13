@@ -57,6 +57,7 @@ export type NormalizedSizeRow = {
   hip?: number | null; // obwód bioder
   length?: number | null; // długość tyłu (góra) / całkowita (dół)
   inseam?: number | null; // długość wewnętrzna nogawki (dół)
+  legOpening?: number | null; // szerokość nogawki u dołu (dół) — tylko informacyjnie, nie wpływa na dobór rozmiaru
 };
 
 /** To, co model ma zwrócić – żadnych decyzji rozmiarowych. */
@@ -369,7 +370,7 @@ ${shopperBlock}${brandStyleSection}${productSection}
 ZWRÓĆ WYŁĄCZNIE czysty JSON (bez \`\`\`), dokładnie w tym kształcie:
 {
   "tabela": [
-    { "rozmiar": "S", "obwodKlatki": 130, "obwodPasa": null, "obwodBioder": null, "dlugosc": 68, "dlugoscNogawki": null }
+    { "rozmiar": "S", "obwodKlatki": 130, "obwodPasa": null, "obwodBioder": null, "dlugosc": 68, "dlugoscNogawki": null, "szerokoscNogawki": null }
   ],
   "kategoria": "gora" | "dol" | "sukienka",
   "krojLuz": "obcisly" | "regularny" | "swobodny" | "oversize",
@@ -388,7 +389,7 @@ ZWRÓĆ WYŁĄCZNIE czysty JSON (bez \`\`\`), dokładnie w tym kształcie:
 
 ZASADY:
 - "tabela": przepisz KAŻDY rozmiar i KAŻDY wymiar z tabeli/zdjęcia/opisu — wliczając SKRAJNE kolumny/wiersze (najmniejszy i największy rozmiar, np. XS i XXL), które łatwo pominąć przy pobieżnym odczycie. Policz kolumny/wiersze w źródle i sprawdź, że masz tyle samo pozycji w "tabela", zanim odpowiesz. Klatkę/pas/biodra wpisuj DOKŁADNIE tak, jak są w źródle — NIE PRZELICZAJ ich sam: jeśli tabela podaje pomiar na płasko (pacha-pacha, "A", "1/2 klatki", "szerokość" — to najczęstsza konwencja na metkach), zostaw liczbę jak jest, program sam wykryje i znormalizuje. Nie mnóż przez 2. Do oceny "krojLuz" poniżej i tak w pamięci przelicz te liczby na pełny obwód (×2), żeby porównać z ciałem — ale w samym polu "tabela" mają zostać nieprzeliczone, takie jak w źródle. Brak wymiaru = null. Nie zgaduj wartości, których nie ma.
-- "dlugoscNogawki" to WYŁĄCZNIE "Inseam" / "Inseam Length" / wewnętrzna długość nogawki (od krocza do dołu) — jeśli źródło ma kolumnę dokładnie o tym znaczeniu, ONA idzie tutaj. "dlugosc" to CAŁKOWITA długość ubrania podana WPROST jako jedna wartość (dla spodni: "Outseam"/"Length" — długość od pasa do dołu na zewnątrz; dla góry: od karku/ramienia do dołu). To DWA RÓŻNE wymiary — nie wpisuj tej samej kolumny do obu. Jeśli źródło NIE podaje całkowitej długości wprost, tylko osobne składowe (np. "Front Rise" + "Inseam"), NIE sumuj ich ani nie zgaduj — zostaw "dlugosc" jako null, "dlugoscNogawki" i tak masz z samego Inseam. Kolumny w rodzaju "Leg Opening" / "Hem Width" / "obwód nogawki u dołu" to SZEROKOŚĆ dołu nogawki, nie długość — naszego pola na to nie ma, zostaw je jako null, nie wciskaj ich do "dlugosc" ani "dlugoscNogawki" tylko dlatego, że nazwa też zawiera "nogawka"/"leg".
+- "dlugoscNogawki" to WYŁĄCZNIE "Inseam" / "Inseam Length" / wewnętrzna długość nogawki (od krocza do dołu) — jeśli źródło ma kolumnę dokładnie o tym znaczeniu, ONA idzie tutaj. "dlugosc" to CAŁKOWITA długość ubrania podana WPROST jako jedna wartość (dla spodni: "Outseam"/"Length" — długość od pasa do dołu na zewnątrz; dla góry: od karku/ramienia do dołu). To DWA RÓŻNE wymiary — nie wpisuj tej samej kolumny do obu. Jeśli źródło NIE podaje całkowitej długości wprost, tylko osobne składowe (np. "Front Rise" + "Inseam"), NIE sumuj ich ani nie zgaduj — zostaw "dlugosc" jako null, "dlugoscNogawki" i tak masz z samego Inseam. Kolumny w rodzaju "Leg Opening" / "Hem Width" / "obwód nogawki u dołu" to SZEROKOŚĆ dołu nogawki, nie długość — idą do "szerokoscNogawki" (tylko dla spodni/jeansów/dresów/szortów), nie wciskaj ich do "dlugosc" ani "dlugoscNogawki" tylko dlatego, że nazwa też zawiera "nogawka"/"leg". Podaj ją DOKŁADNIE jak w źródle (bez przeliczania) — tak jak resztę wymiarów w "tabela".
 - "obwodKlatki" NIE dotyczy spodni/jeansów/dresów/szortów/spódnic (kategoria "dol") — spodnie nie mają obwodu klatki. Zostaw "obwodKlatki": null dla całej tabeli w tej kategorii, NAWET jeśli w źródle jest jakaś inna liczba (np. "Front Rise"/wysokość stanu), której nie umiesz przypisać do żadnego innego pola — puste pole jest lepsze niż wpisanie tam przypadkowej wartości tylko dlatego, że "obwodKlatki" jest pierwsze w przykładzie. Analogicznie "obwodPasa"/"obwodBioder" zwykle nie dotyczą samej góry (t-shirt/koszula/bluza) — tylko dołu i sukienki.
 - Jeśli NIE MA żadnych wymiarów (ani zdjęcia, ani tabeli, ani liczb w opisie): "tabela": [], a Ty sam oszacuj "zapasowyRozmiar" (XS–XXL) i krótkie "zapasoweUzasadnienie" (max 2 zdania, w języku ${langHint}) – jeśli wytyczne marki każą schodzić/podnosić rozmiar, uwzględnij to i wspomnij o tym. W przeciwnym razie zostaw je jako null / "".
 - "kategoria": "dol" = spodnie, jeansy, dresy, szorty, spódnica. "gora" = t-shirt, koszula, bluza, hoodie, sweter, kurtka. "sukienka" = sukienka, kombinezon.
@@ -1529,6 +1530,7 @@ function parseExtraction(json: Record<string, unknown>): ChartExtraction {
         hip: num(o.obwodBioder ?? o.hip),
         length: num(o.dlugosc ?? o.length),
         inseam: num(o.dlugoscNogawki ?? o.inseam),
+        legOpening: num(o.szerokoscNogawki ?? o.legOpening),
       } as NormalizedSizeRow;
     })
     .filter((r): r is NormalizedSizeRow => r !== null);
@@ -1830,8 +1832,9 @@ export function parseStructuredRows(
       hip: num(o.hip),
       length: num(o.length),
       inseam: num(o.inseam),
+      legOpening: num(o.legOpening),
     };
-    if (row.chest || row.waist || row.hip || row.length || row.inseam) {
+    if (row.chest || row.waist || row.hip || row.length || row.inseam || row.legOpening) {
       rows.push(row);
     }
   }
@@ -1854,6 +1857,7 @@ export function structuredRowsAsPromptText(rows: NormalizedSizeRow[]): string {
       if (r.hip != null) dims.push(`biodra ${r.hip}`);
       if (r.length != null) dims.push(`długość ${r.length}`);
       if (r.inseam != null) dims.push(`nogawka ${r.inseam}`);
+      if (r.legOpening != null) dims.push(`szerokość nogawki u dołu ${r.legOpening}`);
       return `Rozmiar ${r.size}: ${dims.join(", ")}`;
     })
     .join("\n");

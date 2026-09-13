@@ -38,6 +38,7 @@ export type GridRow = {
   hip: string;
   length: string;
   inseam: string;
+  legOpening: string;
 };
 
 export const emptyGridRow = (): GridRow => ({
@@ -47,6 +48,7 @@ export const emptyGridRow = (): GridRow => ({
   hip: "",
   length: "",
   inseam: "",
+  legOpening: "",
 });
 
 type SourceRow = {
@@ -56,6 +58,7 @@ type SourceRow = {
   hip?: number | null;
   length?: number | null;
   inseam?: number | null;
+  legOpening?: number | null;
 };
 
 /** Wiersze z zapisanej siatki (structuredSizeData) albo, jako sugestia startowa,
@@ -68,6 +71,7 @@ export function rowsToGrid(rows: SourceRow[]): GridRow[] {
     hip: r.hip != null ? String(r.hip) : "",
     length: r.length != null ? String(r.length) : "",
     inseam: r.inseam != null ? String(r.inseam) : "",
+    legOpening: r.legOpening != null ? String(r.legOpening) : "",
   }));
 }
 
@@ -76,7 +80,11 @@ export function rowsToGrid(rows: SourceRow[]): GridRow[] {
 export function gridToPayload(rows: GridRow[]): string | null {
   const clean = rows
     .map((r) => ({ ...r, size: r.size.trim() }))
-    .filter((r) => r.size && (r.chest || r.waist || r.hip || r.length || r.inseam));
+    .filter(
+      (r) =>
+        r.size &&
+        (r.chest || r.waist || r.hip || r.length || r.inseam || r.legOpening),
+    );
   return clean.length >= 2 ? JSON.stringify(clean) : null;
 }
 
@@ -95,6 +103,7 @@ const ALL_COLS: Array<{ key: keyof GridRow; labelKey: string; ph: string }> = [
   { key: "hip", labelKey: "grid.col.hip", ph: "50" },
   { key: "length", labelKey: "grid.col.length", ph: "68" },
   { key: "inseam", labelKey: "grid.col.inseam", ph: "80" },
+  { key: "legOpening", labelKey: "grid.col.legOpening", ph: "20" },
 ];
 
 export type GarmentCategory = "top" | "bottom" | "dress";
@@ -106,6 +115,16 @@ const DIMS_BY_CATEGORY: Record<GarmentCategory, Array<keyof GridRow>> = {
   top: ["chest", "length"],
   bottom: ["waist", "hip", "inseam", "length"],
   dress: ["chest", "waist", "length"],
+};
+
+// Kolumny UZNAWANE za normalne dla kategorii (używane tylko do ostrzeżenia
+// "nietypowa kolumna" niżej) — szerszy zestaw niż domyślnie pokazywany.
+// Szerokość nogawki u dołu ma sens dla spodni, ale nie jest domyślnie
+// widoczna (rzadko kto ją mierzy) — bez tego wpisu dodanie jej ręcznie przez
+// "+ Dodaj rodzaj pomiaru" fałszywie wyglądałoby jak pomyłka sprzedawcy.
+const VALID_DIMS_BY_CATEGORY: Record<GarmentCategory, Array<keyof GridRow>> = {
+  ...DIMS_BY_CATEGORY,
+  bottom: [...DIMS_BY_CATEGORY.bottom, "legOpening"],
 };
 
 export function SizeGrid({
@@ -174,7 +193,7 @@ export function SizeGrid({
   // ale kolumna spoza typowego zestawu dla tej kategorii (np. nogawka na
   // koszulce) zwykle jest pomyłką przy klikaniu „+ Dodaj wymiar".
   const unusualCols = category
-    ? COLS.filter((c) => !DIMS_BY_CATEGORY[category].includes(c.key))
+    ? COLS.filter((c) => !VALID_DIMS_BY_CATEGORY[category].includes(c.key))
     : [];
   // Miękkie ostrzeżenie #2: kolumna jest widoczna (bo pasuje do kategorii albo
   // sprzedawca ją dodał), ale przynajmniej jeden rozmiar nie ma dla niej
