@@ -260,7 +260,17 @@ function estimateLetterSize(
     const baseIdx = CANON_SIZES.indexOf(normModelSize);
     const HEIGHT_PER_SIZE = 12;
     const raw = (h - modelHeight) / HEIGHT_PER_SIZE;
-    const step = raw >= 0 ? Math.round(raw) : -Math.round(-raw);
+    // Ta sama korekta budowy co w resolveSize (patrz komentarz tam) — model
+    // jest zwykle szczupły/atletyczny, więc czysto wzrostowa kotwica dawała
+    // klientowi o tym samym wzroście, ale wyraźnie masywniejszemu, dokładnie
+    // rozmiar modela. Delikatny nudge (nie osobny szacunek), max ±1 rozmiar.
+    const idealWeightAtHeight = (gender === "female" ? 21.5 : 23.5) * (h / 100) ** 2;
+    const neutralChest = estimateChest(h, idealWeightAtHeight, gender, "standard");
+    const actualChest = estimateChest(h, w, gender, build);
+    const buildNudge = clamp(((actualChest - neutralChest) / 6) * 0.5, -1, 1);
+    const rawAdjusted = raw + buildNudge;
+    const step =
+      rawAdjusted >= 0 ? Math.round(rawAdjusted) : -Math.round(-rawAdjusted);
     let idx = clamp(baseIdx + step, 0, CANON_SIZES.length - 1);
     if (fit === "loose") idx += 1;
     idx = clamp(idx, CANON_SIZES.indexOf("XS"), CANON_SIZES.indexOf("XXL"));
@@ -936,9 +946,32 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
     // klient 5 cm wyższy od modela dostawał od razu rozmiar wyżej.
     const HEIGHT_PER_SIZE = 12;
     const raw = (height - extraction.modelHeight!) / HEIGHT_PER_SIZE;
+    // Kotwica na modelu liczyła WYŁĄCZNIE różnicę wzrostu — waga/budowa klienta
+    // była całkowicie ignorowana, mimo że modele są zwykle szczupli/atletyczni.
+    // Klient przy TYM SAMYM wzroście co model, ale wyraźnie masywniejszy, i tak
+    // dostawał dokładnie rozmiar modela. Model zostaje GŁÓWNYM sygnałem (to
+    // konkretny, potwierdzony przez markę przypadek) — to tylko delikatna
+    // korekta, nie osobny, konkurencyjny szacunek: liczymy, o ile cm szacowany
+    // obwód klienta (już wyliczony wyżej jako `bodyPrimary`) odbiega od
+    // "neutralnej", standardowej budowy przy TYM SAMYM wzroście, i dokładamy
+    // do kroku wzrostowego tylko UŁAMEK tego odchylenia (0.5), przycięty do
+    // max ±1 rozmiaru — żeby nudge nie przebił samego wzorca marki.
+    const idealWeightAtHeight =
+      (gender === "female" ? 21.5 : 23.5) * (height / 100) ** 2;
+    const neutralPrimary = useWaist
+      ? estimateWaist(height, idealWeightAtHeight, gender, "standard")
+      : estimateChest(height, idealWeightAtHeight, gender, "standard");
+    const CM_PER_SIZE_STEP = useWaist ? 5 : 6;
+    const buildNudge = clamp(
+      ((bodyPrimary - neutralPrimary) / CM_PER_SIZE_STEP) * 0.5,
+      -1,
+      1,
+    );
+    const rawAdjusted = raw + buildNudge;
     // Zaokrąglenie „połowa od zera" — inaczej Math.round(-0.5)=0 dawało lekki
     // bias w górę (klient dokładnie pół rozmiaru niższy od modela → rozmiar modela).
-    const step = raw >= 0 ? Math.round(raw) : -Math.round(-raw);
+    const step =
+      rawAdjusted >= 0 ? Math.round(rawAdjusted) : -Math.round(-rawAdjusted);
     const idx = clamp(baseIdx + step, 0, pool.length - 1);
     target = valueOf(pool[idx]);
     window = [target - 1, target + 1];
@@ -951,7 +984,7 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
     // pozycja (interpolacja `raw` między sąsiednimi wierszami w `pool`)
     // sprawia, że pinezka PODJEŻDŻA pod krawędź, zanim rozmiar faktycznie
     // się zmieni — tak samo jak w trybie „po długości bez wzorca" niżej.
-    const contIdx = clamp(baseIdx + raw, 0, pool.length - 1);
+    const contIdx = clamp(baseIdx + rawAdjusted, 0, pool.length - 1);
     const contLo = Math.floor(contIdx);
     const contHi = Math.min(contLo + 1, pool.length - 1);
     const contFrac = contIdx - contLo;
@@ -961,7 +994,7 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
     // Zawsze dołóż sąsiada po stronie, w którą „ciągnie" wzrost — żeby
     // „Dopasowany"/„Luźny" miało czym operować (wcześniej przy małym frac
     // preferencja fasonu była w tym trybie po cichu ignorowana).
-    const frac = raw - step;
+    const frac = rawAdjusted - step;
     if (frac > 0.08 && idx + 1 < pool.length) candRows.push(pool[idx + 1]);
     else if (frac < -0.08 && idx - 1 >= 0) candRows.unshift(pool[idx - 1]);
   } else if (proportional && lengthDimFn) {
