@@ -104,8 +104,6 @@
         </div>
 
         <div class="sa-step" id="sa-step-2" data-sa-step="2" hidden>
-          <button type="button" class="sa-step-back" id="sa-back-btn" data-i18n="back">{{ 'size_advisor.back' | t }}</button>
-
           <span class="sa-label" id="sa-body-label-{{ block.id }}" data-i18n="body">{{ 'size_advisor.body' | t }}</span>
           <div class="sa-pill-group sa-pill-group--2" id="sa-body-group" role="group" aria-labelledby="sa-body-label-{{ block.id }}">
             <button type="button" class="sa-pill-btn" data-value="slim" aria-pressed="false" data-i18n="body_slim">{{ 'size_advisor.body_slim' | t }}</button>
@@ -132,6 +130,8 @@
               <p class="sa-garment-hint" data-i18n="garment_hint">{{ 'size_advisor.garment_hint' | t }}</p>
             </div>
           </div>
+
+          <button type="button" class="sa-step-back" id="sa-back-btn" data-i18n="back">{{ 'size_advisor.back' | t }}</button>
 
           <button type="button" id="get-recommendation-btn">
             <span class="sa-btn-label" data-i18n="calc">{{ 'size_advisor.calc' | t }}</span>
