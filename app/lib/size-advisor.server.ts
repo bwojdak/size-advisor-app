@@ -1059,9 +1059,17 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
       if (useWaist) {
         const w = r.waist;
         if (!w) break;
-        // dzianina / guma rozciąga się ~30%; tkanina prawie wcale.
+        // dzianina / guma rozciąga się ~30%; tkanina prawie wcale. Pas na
+        // gumce/sznurku (dresy, joggery) rozciąga się NIEZALEŻNIE od kroju —
+        // bez tego dresy z regularnym krojem, ale elastycznym pasem (a numer
+        // w tabeli to pas na luzie, mały) prawie zawsze "nie mieściły się" wg
+        // tej podłogi, mimo że korpus już poprawnie dobrał rozmiar wg wzorca
+        // marki / długości — podłoga nadpisywała to na "największy dostępny",
+        // ignorując że pas i tak się dopasuje.
         const give =
-          cut === "relaxed" || cut === "oversize" ? w * 0.3 : Math.max(3, w * 0.05);
+          cut === "relaxed" || cut === "oversize" || extraction.elasticWaist || extraction.stretch
+            ? w * 0.3
+            : Math.max(3, w * 0.05);
         if (w + give >= bodyPrimary) {
           chosen = r;
           floorMatched = true;
