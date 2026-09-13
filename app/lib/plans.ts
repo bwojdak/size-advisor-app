@@ -132,9 +132,7 @@ export function planCaps(plan: string | null | undefined): PlanCapabilities {
  * Płatne plany renderujemy jako „wszystko z {niższy}, plus:" — a skoro
  * Starter/Growth/Pro mają teraz IDENTYCZNE funkcje (patrz PAID_TIER_CAPS),
  * Growth i Pro nie dodają nic poza wyższym miesięcznym limitem: cała ich
- * lista to właśnie ten jeden wiersz. "Priority support" na Pro to jedyny
- * wyjątek — to obietnica procesu wsparcia, nie flaga w kodzie, więc nie
- * musi (i nie powinna) mieć odpowiednika w PlanCapabilities.
+ * lista to właśnie ten jeden wiersz.
  */
 export const PLAN_FEATURES: Record<string, string[]> = {
   [PLAN.FREE]: [
@@ -163,5 +161,5 @@ export const PLAN_FEATURES: Record<string, string[]> = {
     "plans.feat.tester",
   ],
   [PLAN.GROWTH]: ["plans.feat.rec"],
-  [PLAN.PRO]: ["plans.feat.rec", "plans.feat.priority_support"],
+  [PLAN.PRO]: ["plans.feat.rec"],
 };

@@ -337,11 +337,6 @@ export default function PlansPage() {
                             <Text as="p" variant="bodyMd" fontWeight="semibold">
                               ✓ {featText(plan, "plans.feat.rec")}
                             </Text>
-                            {plan === PLAN.PRO ? (
-                              <Text as="p" variant="bodySm">
-                                ✓ {t("plans.feat.priority_support")}
-                              </Text>
-                            ) : null}
                           </>
                         )}
                       </BlockStack>
