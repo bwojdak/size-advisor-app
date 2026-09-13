@@ -146,7 +146,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "analytics.purchases.title": "Ostatnie zakupy z rekomendacji",
     "analytics.purchases.col.date": "Data",
     "analytics.purchases.col.size": "Rozmiar",
-    "analytics.returns.rate.title": "Zwroty zamówień z rekomendacji",
+    "analytics.returns.rate.title": "Zwroty polecanych produktów",
     "analytics.returns.rate.body":
       "Zmierzone: {n} z {m} zakupów z polecanym rozmiarem zostało zwróconych.",
     "analytics.returns.avoided.title": "Szacowane uniknięte zwroty",
@@ -605,7 +605,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "analytics.purchases.title": "Recent purchases from recommendations",
     "analytics.purchases.col.date": "Date",
     "analytics.purchases.col.size": "Size",
-    "analytics.returns.rate.title": "Returns on recommendation orders",
+    "analytics.returns.rate.title": "Returns on recommended products",
     "analytics.returns.rate.body":
       "Measured: {n} of {m} purchases with the recommended size were returned.",
     "analytics.returns.avoided.title": "Estimated returns avoided",

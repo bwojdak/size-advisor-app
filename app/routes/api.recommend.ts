@@ -128,14 +128,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   // wywołanie poza try, żeby ten Response nie został połknięty przez catch.
   const { session } = await authenticate.public.appProxy(request);
   if (!session) {
-    return data({ error: "Sklep nie jest połączony z aplikacją." }, { status: 401 });
+    return data({ error: "Sklep nie jest połączony z aplikacją." }, { status: 200 });
   }
   const shop = session.shop;
 
   if (!allowRequest(clientKey(request, shop))) {
     return data(
       { error: "Zbyt wiele zapytań. Odczekaj chwilę i spróbuj ponownie." },
-      { status: 429 },
+      { status: 200 },
     );
   }
 
@@ -146,7 +146,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const j = JSON.parse(rawText || "{}");
       parsed = j && typeof j === "object" ? (j as Record<string, unknown>) : {};
     } catch {
-      return data({ error: "Nieprawidłowe dane żądania." }, { status: 400 });
+      return data({ error: "Nieprawidłowe dane żądania." }, { status: 200 });
     }
     const gender = String(parsed.gender ?? "").slice(0, 20) || null;
     const bodyType = String(parsed.bodyType ?? "").slice(0, 20) || null;
@@ -167,7 +167,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       weight < 30 ||
       weight > 250
     ) {
-      return data({ error: "Podaj poprawny wzrost i wagę." }, { status: 400 });
+      return data({ error: "Podaj poprawny wzrost i wagę." }, { status: 200 });
     }
 
     // Pola tekstowe produktu z widżetu — przycięte, żeby nie rozdmuchać promptu
@@ -231,7 +231,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             "The size assistant is currently turned off.",
           ),
         },
-        { status: 403 },
+        { status: 200 },
       );
     }
 
@@ -246,7 +246,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             "The size assistant is temporarily unavailable. Please try later or use the product's size chart.",
           ),
         },
-        { status: 503 },
+        { status: 200 },
       );
     }
 
@@ -255,7 +255,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       provider === "gemini" ? process.env.GEMINI_API_KEY : process.env.OPENAI_API_KEY;
     if (!apiKey) {
       console.error(`Brak klucza API dla providera "${provider}".`);
-      return data({ error: "Błąd konfiguracji klucza API po stronie serwera." }, { status: 500 });
+      return data({ error: "Błąd konfiguracji klucza API po stronie serwera." }, { status: 200 });
     }
 
     const brandStyleNotes = settings.aiStyleNotes?.trim() || null;
@@ -471,7 +471,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 "The size assistant is briefly overloaded. Please try again shortly or use the product's size chart.",
               ),
             },
-            { status: 503 },
+            { status: 200 },
           );
         }
         return data(
@@ -481,7 +481,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               "Couldn't work out a size right now. Please try again later.",
             ),
           },
-          { status: 502 },
+          { status: 200 },
         );
       }
 
@@ -605,6 +605,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   } catch (error) {
     console.error("Endpoint Handler Error:", error);
-    return data({ error: "Błąd przetwarzania rekomendacji." }, { status: 500 });
+    return data({ error: "Błąd przetwarzania rekomendacji." }, { status: 200 });
   }
 };
