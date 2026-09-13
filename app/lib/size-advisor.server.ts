@@ -620,11 +620,21 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
     }
   }
 
-  // Wymiar wiążący: dół → pas; sukienka → biust, a jak brak, to biodra/talia
-  // (model bywa niekonsekwentny, w którym polu zapisze obwód sukienki).
+  // Wymiar wiążący: dół → pas, a jak w CAŁEJ tabeli nigdzie nie ma pasa (np.
+  // spódnica opisana tylko obwodem bioder — biodra są wtedy realnym
+  // ograniczeniem dopasowania, nie pas) → biodra zamiast niego. Decyzja jest
+  // dla całej tabeli naraz (nie per wiersz), żeby nie mieszać wymiarów między
+  // rozmiarami, gdy tylko część wierszy ma pas wypełniony. Sukienka → biust,
+  // a jak brak, to biodra/talia (model bywa niekonsekwentny, w którym polu
+  // zapisze obwód sukienki).
+  const bottomHasWaist = rows.some(
+    (r) => typeof r.waist === "number" && r.waist > 0,
+  );
   const primaryOf = (r: NormalizedSizeRow) =>
     useWaist
-      ? r.waist
+      ? bottomHasWaist
+        ? r.waist
+        : r.hip
       : category === "dress"
         ? (r.chest ?? r.hip ?? r.waist)
         : r.chest;
@@ -872,7 +882,17 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
           (usable.length >= 2 &&
             waistSpreadForElasticGuess <= 10 &&
             usable.every((r) => (primaryOf(r) as number) < bodyPrimary - 3))));
-  const proportional = topProportional || bottomElastic;
+  // Ogólny wentyl bezpieczeństwa NIEZALEŻNY od kategorii: gdy w CAŁEJ tabeli
+  // nie ma żadnego wymiaru obwodowego (klatka/pas/biodra — cokolwiek, czego
+  // szuka `primaryOf` dla tej kategorii), ale jest realna długość — lepiej
+  // dobrać po długości niż zignorować kompletną tabelę i spaść na goły
+  // szacunek z samego wzrostu/wagi (np. sukienka opisana tylko długością,
+  // spódnica opisana tylko biodrami gdy akurat i tych brak). `topProportional`
+  // i `bottomElastic` już to łapią dla swoich kategorii przy dodatkowych
+  // warunkach (krój, elastyczność) — to jest wspólna siatka na resztę.
+  const noPrimaryDataAtAll =
+    usable.length === 0 && lengthDimFn != null && spread(lengthDimFn) >= 2;
+  const proportional = topProportional || bottomElastic || noPrimaryDataAtAll;
 
   let candRows: NormalizedSizeRow[];
   let window: [number, number];
