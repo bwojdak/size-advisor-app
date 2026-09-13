@@ -1614,7 +1614,11 @@ function parseModelJson(raw: string): Record<string, unknown> {
 
 function num(v: unknown): number | null {
   const n =
-    typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : NaN;
+    typeof v === "string"
+      ? parseFloat(v.replace(",", "."))
+      : typeof v === "number"
+        ? v
+        : NaN;
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
@@ -1951,8 +1955,11 @@ export function parseStructuredRows(
     return null;
   }
   if (!Array.isArray(arr)) return null;
+  // Przecinek jako separator dziesiętny (PL/EU) — zabezpieczenie server-side
+  // na wypadek starszych zapisanych danych sprzed poprawki w SizeGrid, albo
+  // innej ścieżki zapisu (import CSV), która nie przechodzi przez UI siatki.
   const num = (v: unknown) => {
-    const n = Number(v);
+    const n = Number(typeof v === "string" ? v.replace(",", ".") : v);
     return Number.isFinite(n) && n > 0 && n < 400 ? Math.round(n * 10) / 10 : null;
   };
   const rows: NormalizedSizeRow[] = [];

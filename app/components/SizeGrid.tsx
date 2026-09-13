@@ -16,14 +16,19 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 // Siatka trzyma wartości ZAWSZE w cm (tak zapisujemy i tak liczy silnik).
 // Jednostka to tylko wygoda przy wpisywaniu — przelicza przy wyświetlaniu i
 // przy zapisie pojedynczej komórki, sama siatka (GridRow) tego nie widzi.
+// Przecinek jako separator dziesiętny (naturalny dla PL/EU) — bez tego np.
+// "90,5" dawało Number()=NaN i cała komórka (albo cały wiersz, jeśli
+// wszystkie pola miały przecinek) cicho znikała przy zapisie, bez żadnego
+// ostrzeżenia dla admina.
+const toDot = (s: string) => s.replace(",", ".");
 const cmToDisplay = (cm: string, unit: "cm" | "in") => {
   if (!cm) return "";
-  const n = Number(cm);
+  const n = Number(toDot(cm));
   return Number.isFinite(n) ? String(unit === "in" ? round1(n / CM_PER_IN) : n) : cm;
 };
 const displayToCm = (val: string, unit: "cm" | "in") => {
   if (!val) return "";
-  const n = Number(val);
+  const n = Number(toDot(val));
   return Number.isFinite(n) ? String(unit === "in" ? round1(n * CM_PER_IN) : n) : val;
 };
 
