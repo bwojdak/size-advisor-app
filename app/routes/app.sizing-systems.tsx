@@ -12,6 +12,7 @@ import {
   Layout,
   Modal,
   Page,
+  Tag,
   Text,
   TextField,
   Thumbnail,
@@ -411,6 +412,28 @@ export default function SizingSystemsPage() {
     }
   };
 
+  const removeProduct = async (s: SystemView, p: AttachedProduct) => {
+    setBusyId(s.id);
+    try {
+      await authFetch(
+        "/app/product-map",
+        { sizingSystemId: null, productIds: [p.id] },
+        locale,
+      );
+      toast(t("sizingSystems.unmapped", { title: p.title || `#${p.id}` }));
+      revalidator.revalidate();
+    } catch (err) {
+      toast(
+        err instanceof Error && err.message
+          ? err.message
+          : t("settings.error.saveFailed"),
+        true,
+      );
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const addProducts = async (s: SystemView) => {
     const api = (
       window as unknown as {
@@ -539,9 +562,9 @@ export default function SizingSystemsPage() {
                         ) : (
                           <InlineStack gap="150" wrap>
                             {s.products.slice(0, 12).map((p) => (
-                              <Badge key={p.id}>
+                              <Tag key={p.id} onRemove={() => removeProduct(s, p)}>
                                 {p.title || `#${p.id}`}
-                              </Badge>
+                              </Tag>
                             ))}
                             {s.products.length > 12 ? (
                               <Text

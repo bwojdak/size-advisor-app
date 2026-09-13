@@ -55,6 +55,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "sizingSystems.addProducts": "Przypnij produkty",
     "sizingSystems.mappedCount": "Przypięte produkty: {n}",
     "sizingSystems.mapped": "Przypięto {n} produktów",
+    "sizingSystems.unmapped": "Odpięto „{title}” (wrócił do własnej konfiguracji)",
     "sizingSystems.confirmDelete":
       "Usunąć system „{name}”? Odepnie się od {n} produktów (wrócą do własnej konfiguracji).",
     "sizingSystems.nameLabel": "Nazwa systemu",
@@ -508,6 +509,7 @@ const messages: Record<Locale, Record<string, string>> = {
     "sizingSystems.addProducts": "Attach products",
     "sizingSystems.mappedCount": "Attached products: {n}",
     "sizingSystems.mapped": "Attached {n} products",
+    "sizingSystems.unmapped": "Detached \"{title}\" (back to its own config)",
     "sizingSystems.confirmDelete":
       "Delete the \"{name}\" system? It will detach from {n} products (they go back to their own config).",
     "sizingSystems.nameLabel": "System name",
