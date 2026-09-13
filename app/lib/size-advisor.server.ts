@@ -1001,6 +1001,7 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
           ? 3 + heavy
           : 2 + heavy; // relaxed / oversize – i tak jest luzu w nadmiarze
     const ci = rows.findIndex((r) => r.size === chosen.size);
+    let floorMatched = false;
     for (let i = ci; i < rows.length; i++) {
       const r = rows[i];
       if (useWaist) {
@@ -1011,6 +1012,7 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
           cut === "relaxed" || cut === "oversize" ? w * 0.3 : Math.max(3, w * 0.05);
         if (w + give >= bodyPrimary) {
           chosen = r;
+          floorMatched = true;
           break;
         }
       } else {
@@ -1021,10 +1023,33 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
         const give = extraction.stretch ? 3 : 0;
         if (c + give >= bodyPrimary + minEase) {
           chosen = r;
+          floorMatched = true;
           break;
         }
       }
-      if (i === rows.length - 1) chosen = r; // nic nie pasuje → największy
+      if (i === rows.length - 1) chosen = r; // nic nie pasuje → największy (tymczasowo)
+    }
+    // Tabela jest za mała dla tej sylwetki — żaden rozmiar fizycznie nie
+    // starczy, wzięliśmy ostatni wiersz jako "najbliższy możliwy". Ale gdy
+    // kilka rozmiarów wiąże się tym samym maksymalnym obwodem (zwykły i
+    // "Tall" o tej samej talii, różniące się tylko nogawką — jak w tabeli
+    // jeansów z tej sesji), wybór między nimi NIE powinien zależeć od
+    // przypadkowej kolejności wpisania w panelu (poprzednio: `rows[rows
+    // .length-1]` = cokolwiek admin wpisał jako ostatnie). Powinien trafić w
+    // nogawkę pasującą do wzrostu — tak samo jak remis-breaker wyżej.
+    if (!floorMatched && useWaist) {
+      const maxWaist = Math.max(
+        ...rows.map((r) => (typeof r.waist === "number" ? r.waist : -Infinity)),
+      );
+      const tied = rows.filter((r) => r.waist === maxWaist);
+      if (tied.length > 1) {
+        const [ilo, ihi] = inseamBand(height);
+        const fit = tied.find(
+          (r) =>
+            typeof r.inseam === "number" && r.inseam >= ilo && r.inseam <= ihi,
+        );
+        if (fit) chosen = fit;
+      }
     }
   }
 
