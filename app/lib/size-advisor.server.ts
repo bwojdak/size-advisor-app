@@ -630,6 +630,9 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
   const bottomHasWaist = rows.some(
     (r) => typeof r.waist === "number" && r.waist > 0,
   );
+  const topHasChest = rows.some(
+    (r) => typeof r.chest === "number" && r.chest > 0,
+  );
   const primaryOf = (r: NormalizedSizeRow) =>
     useWaist
       ? bottomHasWaist
@@ -637,7 +640,9 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
         : r.hip
       : category === "dress"
         ? (r.chest ?? r.hip ?? r.waist)
-        : r.chest;
+        : topHasChest
+          ? r.chest
+          : r.hip;
   const usable = rows.filter(
     (r) => typeof primaryOf(r) === "number" && (primaryOf(r) as number) > 0,
   );
@@ -1041,17 +1046,28 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
       tieBrokenBy = "midpoint";
     }
 
-    // Nogawka jako fallback: tylko jeśli wybrany rozmiar NIE trafia we wzrost,
-    // a inny kandydat trafia.
+    // Nogawka jako fallback: gdy wybrany rozmiar nie trafia dobrze we wzrost,
+    // a inny kandydat trafia lepiej. Odległość do pasma (nie samo "w paśmie
+    // tak/nie") — inaczej `inseamBand` ma progi co konkretny wzrost (165, 175,
+    // 183, 190 cm) i klient o 1 cm wyższy/niższy od takiego progu potrafił
+    // dostać mniejszy rozmiar niż sąsiad (pasmo się przesuwało, a kandydat,
+    // który jeszcze przed chwilą "łapał się" w paśmie, nagle przestawał —
+    // mimo że jego nogawka wcale się nie zmieniła, tylko granica przeskoczyła).
     if (mode === "waist" && tieBrokenBy === "midpoint") {
       const [ilo, ihi] = inseamBand(height);
-      const okInseam = (r: NormalizedSizeRow) =>
-        typeof r.inseam === "number" &&
-        (r.inseam as number) >= ilo &&
-        (r.inseam as number) <= ihi;
-      if (!okInseam(chosen)) {
-        const alt = candRows.find(okInseam);
-        if (alt) chosen = alt;
+      const bandDist = (v: number) => (v < ilo ? ilo - v : v > ihi ? v - ihi : 0);
+      if (typeof chosen.inseam === "number") {
+        let best = chosen;
+        let bestDist = bandDist(chosen.inseam);
+        for (const r of candRows) {
+          if (typeof r.inseam !== "number") continue;
+          const d = bandDist(r.inseam);
+          if (d < bestDist) {
+            bestDist = d;
+            best = r;
+          }
+        }
+        chosen = best;
       }
     }
   }
