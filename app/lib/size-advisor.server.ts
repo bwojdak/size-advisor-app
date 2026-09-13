@@ -606,9 +606,18 @@ export function resolveSize(input: ResolveInput): ResolveResult | null {
       hip: hipHalf && r.hip ? r.hip * 2 : r.hip,
     }));
   }
-  // Sanity: obwód klatki/pasa/bioder > ~135 cm dla NAJMNIEJSZEGO rozmiaru to
-  // prawie na pewno błąd (podwojona wartość, która już była pełna). Cofnij ×2.
+  // Sanity: obwód klatki/pasa/bioder > ~135 cm dla NAJMNIEJSZEGO rozmiaru PO
+  // TYM, jak sami go przed chwilą podwoiliśmy (isHalf wyżej) to prawie na
+  // pewno oznacza, że wcale nie trzeba było podwajać — wartość była już
+  // pełnym obwodem. Cofamy WYŁĄCZNIE własne podwojenie (`*Half` musi być
+  // true dla tego wymiaru) — bez tego warunku ten sam próg 135cm fałszywie
+  // "poprawiał" prawdziwe, nietknięte tabele specjalistycznych sklepów plus-
+  // size, których NAJMNIEJSZY rozmiar (np. 3XL) sam w sobie ma >135cm klatki —
+  // takich danych nigdy nie dotknęliśmy (isHalf ich nie podwoił, bo nie
+  // wszystkie wartości były <78), więc nie ma tu niczego do cofania.
+  const halfByKey = { chest: chestHalf, waist: waistHalf, hip: hipHalf };
   for (const key of ["chest", "waist", "hip"] as const) {
+    if (!halfByKey[key]) continue;
     const vals = rows
       .map((r) => r[key])
       .filter((v): v is number => typeof v === "number" && v > 0);
